@@ -1,0 +1,639 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<title>Forehead Game</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+  html,body{margin:0;height:100%;background:#111827;color:#f9fafb;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;overflow:hidden}
+  .screen{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;padding:max(16px,env(safe-area-inset-top)) 20px max(16px,env(safe-area-inset-bottom));text-align:center;overflow-y:auto}
+  .screen.active{display:flex}
+  h1{margin:0 0 4px;font-size:2rem}
+  p.sub{margin:0 0 20px;opacity:.7}
+  .card{width:100%;max-width:420px;display:flex;flex-direction:column;gap:12px}
+  label{display:flex;flex-direction:column;gap:6px;text-align:left;font-size:.9rem;opacity:.9}
+  select,textarea,input[type=number]{width:100%;padding:12px;border-radius:12px;border:1px solid #374151;background:#1f2937;color:#fff;font-size:1rem}
+  textarea{min-height:90px;resize:vertical}
+  button{padding:16px;border:0;border-radius:14px;font-size:1.15rem;font-weight:700;background:#22c55e;color:#052e16;cursor:pointer}
+  button.secondary{background:#374151;color:#f9fafb;font-weight:600;font-size:1rem;padding:12px}
+  .big{font-size:min(16vw,26vh);font-weight:800;line-height:1.05;word-break:break-word;padding:0 4vw}
+  .msg{font-size:min(8vw,12vh);font-weight:800;line-height:1.15}
+  .small{opacity:.7;font-size:1rem;margin-top:12px}
+  #game{transition:background .08s}
+  #game.ok{background:#16a34a}
+  #game.pass{background:#dc2626}
+  #hud{position:absolute;top:max(10px,env(safe-area-inset-top));left:0;right:0;display:flex;justify-content:space-between;padding:0 20px;font-size:1.4rem;font-weight:700;opacity:.85;pointer-events:none}
+  #hud span:first-child{margin-left:96px}
+  .backBtn{position:absolute;top:max(10px,env(safe-area-inset-top));left:12px;z-index:5;padding:8px 14px;font-size:.95rem;font-weight:600;border-radius:10px;background:rgba(55,65,81,.85);color:#f9fafb}
+  #rotate{display:none;position:absolute;bottom:14px;font-size:.9rem;opacity:.7}
+  @media (orientation:portrait){#rotate{display:block}}
+  ul.res{list-style:none;padding:0;margin:0;text-align:left;max-height:34vh;overflow-y:auto;width:100%}
+  ul.res li{padding:6px 10px;border-radius:8px;margin-bottom:4px;background:#1f2937}
+  ul.res li.c{border-left:5px solid #22c55e}
+  ul.res li.p{border-left:5px solid #ef4444;opacity:.8}
+  .score{font-size:4rem;font-weight:800;margin:0}
+  .row{display:flex;gap:12px}.row>*{flex:1}
+</style>
+</head>
+<body>
+
+<!-- MENU -->
+<section id="menu" class="screen active">
+  <div class="card">
+    <h1>🤯 Forehead Game</h1>
+    <p class="sub">Phone on your forehead. Tilt <b>down</b> = got it, tilt <b>up</b> = pass.</p>
+    <label>Deck
+      <select id="deck"></select>
+    </label>
+    <label id="customWrap" style="display:none">Your words (comma or new line separated)
+      <textarea id="custom" placeholder="pizza, Eiffel Tower, karaoke..."></textarea>
+    </label>
+    <label>Round length (seconds)
+      <input type="number" id="secs" value="60" min="15" max="300" step="5">
+    </label>
+    <button id="startBtn">Start</button>
+    <button class="secondary" id="recalBtn">Recalibrate tilt direction next game</button>
+    <p class="small" id="sensorNote"></p>
+  </div>
+</section>
+
+<!-- PREP / CALIBRATION -->
+<section id="prep" class="screen">
+  <button class="backBtn" aria-label="Back">← Back</button>
+  <div class="msg" id="prepMsg"></div>
+  <div class="small" id="prepSub"></div>
+</section>
+
+<!-- GAME -->
+<section id="game" class="screen">
+  <button class="backBtn" aria-label="Back">← Back</button>
+  <div id="hud"><span id="timer">60</span><span id="score">0</span></div>
+  <div class="big" id="word"></div>
+  <div id="rotate">↻ Rotate your phone to landscape</div>
+</section>
+
+<!-- RESULTS -->
+<section id="results" class="screen">
+  <div class="card">
+    <p class="sub">Time's up!</p>
+    <p class="score" id="finalScore">0</p>
+    <ul class="res" id="resList"></ul>
+    <div class="row">
+      <button id="againBtn">Play again</button>
+      <button class="secondary" id="menuBtn">Menu</button>
+    </div>
+  </div>
+</section>
+
+<script>
+(() => {
+  /* ---------- Word lists: one entry per line. Add or edit lists here! ---------- */
+  const LISTS = {
+"Celebrities": `
+Beyoncé
+Taylor Swift
+Rihanna
+Lady Gaga
+Ariana Grande
+Billie Eilish
+Adele
+Ed Sheeran
+Justin Bieber
+Bruno Mars
+Shakira
+Madonna
+Michael Jackson
+Elvis Presley
+Eminem
+Kanye West
+Drake
+Snoop Dogg
+Jay-Z
+Dua Lipa
+The Weeknd
+Harry Styles
+Céline Dion
+Johnny Hallyday
+Stromae
+Aya Nakamura
+Angèle
+Jul
+Booba
+Daft Punk
+Tom Cruise
+Brad Pitt
+Angelina Jolie
+Leonardo DiCaprio
+Johnny Depp
+Will Smith
+Dwayne Johnson
+Jackie Chan
+Arnold Schwarzenegger
+Sylvester Stallone
+Keanu Reeves
+Robert Downey Jr.
+Chris Hemsworth
+Ryan Reynolds
+Ryan Gosling
+Margot Robbie
+Scarlett Johansson
+Jennifer Lawrence
+Emma Watson
+Emma Stone
+Zendaya
+Timothée Chalamet
+Tom Holland
+Morgan Freeman
+Samuel L. Jackson
+Denzel Washington
+Meryl Streep
+Julia Roberts
+Nicole Kidman
+Sandra Bullock
+Jim Carrey
+Adam Sandler
+Mr. Bean
+Charlie Chaplin
+Marilyn Monroe
+Audrey Hepburn
+Jean Dujardin
+Omar Sy
+Marion Cotillard
+Jean Reno
+Gérard Depardieu
+Louis de Funès
+Audrey Tautou
+Léa Seydoux
+Kylian Mbappé
+Lionel Messi
+Cristiano Ronaldo
+Zinedine Zidane
+Neymar
+Pelé
+Diego Maradona
+Antoine Griezmann
+LeBron James
+Michael Jordan
+Stephen Curry
+Serena Williams
+Roger Federer
+Rafael Nadal
+Novak Djokovic
+Usain Bolt
+Tiger Woods
+Lewis Hamilton
+Max Verstappen
+Simone Biles
+Mike Tyson
+Muhammad Ali
+Elon Musk
+Jeff Bezos
+Bill Gates
+Mark Zuckerberg
+Steve Jobs
+Oprah Winfrey
+Kim Kardashian
+Kylie Jenner
+MrBeast
+PewDiePie
+Squeezie
+Cyprien
+Barack Obama
+Donald Trump
+Emmanuel Macron
+Napoleon
+Albert Einstein
+Queen Elizabeth II
+Prince Harry
+Kate Middleton
+Pope Francis
+Gordon Ramsay
+Jamie Oliver
+Greta Thunberg
+Leonardo da Vinci
+Mozart
+Pablo Picasso
+Salvador Dalí
+Frida Kahlo
+Stephen Hawking
+`,
+"Movies": `
+Titanic
+Avatar
+The Lion King
+Frozen
+Toy Story
+Finding Nemo
+Shrek
+Up
+Inside Out
+Coco
+Ratatouille
+Cars
+Monsters, Inc.
+The Incredibles
+Moana
+Aladdin
+Beauty and the Beast
+The Little Mermaid
+Despicable Me
+Kung Fu Panda
+Madagascar
+Ice Age
+How to Train Your Dragon
+Spirited Away
+My Neighbor Totoro
+Harry Potter
+The Lord of the Rings
+The Hobbit
+Star Wars
+Jurassic Park
+Jaws
+E.T. the Extra-Terrestrial
+Back to the Future
+Indiana Jones
+Raiders of the Lost Ark
+Gladiator
+Braveheart
+Forrest Gump
+The Shawshank Redemption
+The Godfather
+Pulp Fiction
+Fight Club
+The Matrix
+Inception
+Interstellar
+The Dark Knight
+Batman
+Spider-Man
+Iron Man
+The Avengers
+Black Panther
+Guardians of the Galaxy
+Deadpool
+Thor
+Captain America
+Doctor Strange
+Wonder Woman
+Superman
+Joker
+Barbie
+Oppenheimer
+Top Gun
+Mission: Impossible
+James Bond
+Skyfall
+Die Hard
+Terminator
+Rocky
+Rambo
+Mad Max: Fury Road
+John Wick
+Fast & Furious
+Pirates of the Caribbean
+Transformers
+Men in Black
+Ghostbusters
+Home Alone
+Mrs. Doubtfire
+The Mask
+Ace Ventura
+Dumb and Dumber
+The Hangover
+Bridesmaids
+Mean Girls
+Legally Blonde
+Pretty Woman
+Notting Hill
+Love Actually
+Bridget Jones's Diary
+The Notebook
+La La Land
+Mamma Mia!
+Grease
+Dirty Dancing
+The Sound of Music
+Mary Poppins
+Charlie and the Chocolate Factory
+Alice in Wonderland
+Edward Scissorhands
+Beetlejuice
+Psycho
+The Shining
+Alien
+The Exorcist
+Scream
+It
+Get Out
+A Quiet Place
+Jaws 2
+King Kong
+Godzilla
+Planet of the Apes
+Blade Runner
+Dune
+Gravity
+The Martian
+Back to the Future Part II
+Intouchables
+Amélie
+Taxi
+Les Visiteurs
+Bienvenue chez les Ch'tis
+Le Fabuleux Destin d'Amélie Poulain
+Astérix et Obélix : Mission Cléopâtre
+Le Dîner de cons
+Les Bronzés
+La Grande Vadrouille
+Léon
+Parasite
+Squid Game
+Oldboy
+Crouching Tiger, Hidden Dragon
+Slumdog Millionaire
+Life of Pi
+The Truman Show
+Catch Me If You Can
+The Wolf of Wall Street
+Django Unchained
+Kill Bill
+Inglourious Basterds
+Schindler's List
+Saving Private Ryan
+Apocalypse Now
+Taxi Driver
+Goodfellas
+Scarface
+Casablanca
+Gone with the Wind
+The Wizard of Oz
+Cast Away
+The Green Mile
+Good Will Hunting
+A Beautiful Mind
+The Social Network
+`
+  };
+
+  const DECKS = {};
+  for (const [name, txt] of Object.entries(LISTS))
+    DECKS[name] = txt.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+
+  const $ = s => document.querySelector(s);
+  const screens = ["menu","prep","game","results"];
+  const show = id => screens.forEach(s => $("#"+s).classList.toggle("active", s===id));
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  /* ---------- Deck UI ---------- */
+  const deckSel = $("#deck");
+  const CUSTOM = "__custom__";
+  Object.keys(DECKS).forEach(k => deckSel.add(new Option(k + " (" + DECKS[k].length + ")", k)));
+  deckSel.add(new Option("Custom words…", CUSTOM));
+  try {
+    $("#custom").value = localStorage.getItem("fg_custom") || "";
+    const saved = localStorage.getItem("fg_deck");
+    if (saved && [...deckSel.options].some(o => o.value === saved)) deckSel.value = saved;
+  } catch(e){}
+  const syncCustom = () => $("#customWrap").style.display = deckSel.value === CUSTOM ? "flex" : "none";
+  deckSel.onchange = syncCustom; syncCustom();
+
+  /* ---------- Sensor ---------- */
+  let z = 0;                 // latest gravity along screen normal, in g (≈ -1..1)
+  let sensorOn = false;
+  let dir = 0;               // +1 or -1: sign of z-change when tilting DOWN. 0 = unknown.
+  try { dir = parseInt(localStorage.getItem("fg_dir") || "0", 10) || 0; } catch(e){}
+
+  let motionSeen = false, sensorWhy = "";
+  function onMotion(e){
+    const a = e.accelerationIncludingGravity;
+    if (!a || a.z == null) return;
+    motionSeen = true; sensorOn = true;
+    z = Math.max(-1.2, Math.min(1.2, a.z / 9.81));
+  }
+  // Fallback: derive gravity along the screen normal from orientation angles
+  function onOrient(e){
+    if (motionSeen || e.beta == null || e.gamma == null) return;
+    const r = Math.PI / 180;
+    z = Math.cos(e.beta * r) * Math.cos(e.gamma * r);
+    sensorOn = true;
+  }
+  let listening = false;
+  function listen(){
+    if (listening) return; listening = true;
+    window.addEventListener("devicemotion", onMotion);
+    window.addEventListener("deviceorientation", onOrient);
+    window.addEventListener("deviceorientationabsolute", onOrient);
+  }
+
+  async function enableSensor(permP){
+    sensorWhy = "";
+    if (!window.isSecureContext) { sensorWhy = "This page isn't served over HTTPS (open the https:// GitHub Pages link, not a file)."; return false; }
+    try {
+      if (permP) {
+        const r = await permP;
+        if (r !== "granted") { sensorWhy = "Motion access was denied. On iPhone: fully close Safari, reopen the page and tap Allow (or Settings → Safari → Motion & Orientation Access)."; return false; }
+      }
+    } catch(e){ sensorWhy = "Motion permission failed: " + (e && e.message || e); return false; }
+    listen();
+    const t0 = performance.now();
+    while (!sensorOn && performance.now() - t0 < 3000) await sleep(100);
+    if (!sensorOn) sensorWhy = "No motion data received. On Android Chrome check Site settings → Motion sensors is allowed (and Battery saver is off); in-app browsers often block sensors, so use Chrome/Safari directly.";
+    return sensorOn;
+  }
+
+  // On platforms that need no permission prompt, start listening right away
+  if (typeof DeviceMotionEvent === "undefined" || typeof DeviceMotionEvent.requestPermission !== "function") listen();
+
+  /* ---------- Game state ---------- */
+  let words = [], queue = [], correct = [], passed = [];
+  let phase = "menu", armed = false, neutral = 0, lock = false, endAt = 0, wakeLock = null;
+  let touchMode = false;
+
+  const shuffle = a => { for (let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]];} return a; };
+  const nextWord = () => { if (!queue.length) queue = shuffle(words.slice()); return queue.pop(); };
+
+  function getWords(){
+    if (deckSel.value === CUSTOM) {
+      const txt = $("#custom").value;
+      try { localStorage.setItem("fg_custom", txt); } catch(e){}
+      return txt.split(/[,\n]/).map(s => s.trim()).filter(Boolean);
+    }
+    return DECKS[deckSel.value] || [];
+  }
+
+  /* ---------- Feedback (sound / vibration) ---------- */
+  let ac;
+  function beep(freq, dur=0.15){
+    try {
+      ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.frequency.value = freq; g.gain.value = 0.15;
+      o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + dur);
+    } catch(e){}
+  }
+  const buzz = p => { try { navigator.vibrate && navigator.vibrate(p); } catch(e){} };
+
+  /* ---------- Flow ---------- */
+  let run = 0;
+  const CANCEL = {};
+  async function start(){
+    const my = ++run;
+    try { await startInner(my); } catch(e){ if (e !== CANCEL) throw e; }
+  }
+  async function startInner(my){
+    const nap = async ms => { await sleep(ms); if (my !== run) throw CANCEL; };
+    words = getWords();
+    if (words.length < 3) { alert("Need at least 3 words in the deck."); return; }
+    try { localStorage.setItem("fg_deck", deckSel.value); } catch(e){}
+
+    // Must be called directly from the tap (iOS permission + fullscreen)
+    const permP = (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function")
+      ? DeviceMotionEvent.requestPermission() : null;
+    try { document.documentElement.requestFullscreen?.().then(() => screen.orientation?.lock?.("landscape").catch(()=>{})).catch(()=>{}); } catch(e){}
+    try { navigator.wakeLock?.request("screen").then(l => wakeLock = l).catch(()=>{}); } catch(e){}
+    beep(1, 0.01); // unlock audio
+
+    show("prep");
+    $("#prepMsg").textContent = "Starting sensors…"; $("#prepSub").textContent = "";
+    phase = "prep";
+    if (!sensorOn || permP) await enableSensor(permP);
+    if (my !== run) throw CANCEL;
+    touchMode = !sensorOn;
+
+    if (touchMode) {
+      neutral = 0;
+      $("#prepMsg").textContent = "No motion sensor found";
+      $("#prepSub").textContent = sensorWhy + "  Touch mode: tap the bottom half = correct, top half = pass.";
+      await nap(5000);
+    } else {
+      // 1. Put on forehead, sample neutral pose
+      for (let i = 5; i >= 1; i--) {
+        $("#prepMsg").textContent = "Put the phone on your forehead 🤳";
+        $("#prepSub").textContent = "Screen facing out, hold it upright… " + i;
+        if (i === 1) { // average over last second
+          let sum = 0, n = 0; const t0 = performance.now();
+          while (performance.now() - t0 < 1000) { sum += z; n++; await nap(30); }
+          neutral = sum / n;
+        } else await nap(1000);
+      }
+      // 2. One-time calibration of tilt direction (iOS and Android differ in sign)
+      if (!dir) {
+        $("#prepMsg").textContent = "Now tilt DOWN ⬇️";
+        $("#prepSub").textContent = "Screen towards the floor, like you got it right";
+        const t0 = performance.now();
+        while (Math.abs(z - neutral) < 0.45 && performance.now() - t0 < 12000) await nap(40);
+        dir = (z - neutral) >= 0 ? 1 : -1;
+        try { localStorage.setItem("fg_dir", String(dir)); } catch(e){}
+        buzz(80); beep(660);
+        $("#prepMsg").textContent = "Good! Back up ⬆️";
+        $("#prepSub").textContent = "";
+        const t1 = performance.now();
+        while (Math.abs(z - neutral) > 0.25 && performance.now() - t1 < 8000) await nap(40);
+        await nap(500);
+      }
+    }
+
+    // 3. Countdown
+    for (let i = 3; i >= 1; i--) { $("#prepMsg").textContent = i; $("#prepSub").textContent = "Get ready!"; beep(440); await nap(850); }
+    beginRound();
+  }
+
+  function beginRound(){
+    const secs = Math.max(15, Math.min(300, parseInt($("#secs").value, 10) || 60));
+    correct = []; passed = []; queue = []; armed = false; lock = false;
+    endAt = performance.now() + secs * 1000;
+    phase = "play";
+    $("#score").textContent = 0;
+    $("#word").textContent = nextWord();
+    $("#game").className = "screen active";
+    show("game"); beep(880, 0.25); buzz(150);
+  }
+
+  function answer(kind){
+    if (phase !== "play" || lock) return;
+    lock = true; armed = false;
+    const w = $("#word").textContent;
+    const g = $("#game");
+    if (kind === "ok") { correct.push(w); g.classList.add("ok"); $("#word").textContent = "✔ CORRECT!"; beep(784, 0.2); buzz(60); }
+    else { passed.push(w); g.classList.add("pass"); $("#word").textContent = "PASS"; beep(220, 0.2); buzz([40,40,40]); }
+    $("#score").textContent = correct.length;
+    setTimeout(() => {
+      g.classList.remove("ok","pass");
+      if (phase === "play") $("#word").textContent = nextWord();
+      lock = false;
+      // Must return to neutral before next answer registers
+      armed = false;
+    }, 750);
+  }
+
+  function endRound(){
+    phase = "results";
+    beep(520, 0.4); buzz(400);
+    $("#finalScore").textContent = correct.length;
+    const ul = $("#resList"); ul.innerHTML = "";
+    correct.forEach(w => { const li = document.createElement("li"); li.className = "c"; li.textContent = "✔ " + w; ul.appendChild(li); });
+    passed.forEach(w => { const li = document.createElement("li"); li.className = "p"; li.textContent = "✘ " + w; ul.appendChild(li); });
+    show("results");
+    try { wakeLock && wakeLock.release(); wakeLock = null; } catch(e){}
+    try { document.fullscreenElement && document.exitFullscreen(); } catch(e){}
+  }
+
+  /* ---------- Main loop ---------- */
+  const TRIGGER = 0.55;   // ≈ 33°+ of extra tilt from neutral
+  const REARM   = 0.28;   // must come back near neutral before next trigger
+  setInterval(() => {
+    if (phase !== "play") return;
+    const left = Math.max(0, endAt - performance.now());
+    $("#timer").textContent = Math.ceil(left / 1000);
+    if (left <= 0) { endRound(); return; }
+    if (touchMode || lock) return;
+    const d = (z - neutral) * dir;           // + = tilted down, − = tilted up
+    if (armed) {
+      if (d > TRIGGER) answer("ok");
+      else if (d < -TRIGGER) answer("pass");
+    } else if (Math.abs(d) < REARM) armed = true;
+  }, 40);
+
+  /* ---------- Touch / keyboard fallback ---------- */
+  $("#game").addEventListener("pointerdown", e => {
+    if (!touchMode || e.target.closest(".backBtn")) return;
+    answer(e.clientY > innerHeight / 2 ? "ok" : "pass");
+  });
+  window.addEventListener("keydown", e => {
+    if (phase !== "play") return;
+    if (e.key === "ArrowDown") answer("ok");
+    if (e.key === "ArrowUp") answer("pass");
+  });
+
+  /* ---------- Buttons ---------- */
+  $("#startBtn").onclick = start;
+  $("#againBtn").onclick = start;
+  function goBack(){
+    run++; phase = "menu"; lock = false;
+    $("#game").classList.remove("ok","pass");
+    show("menu");
+    try { wakeLock && wakeLock.release(); wakeLock = null; } catch(e){}
+    try { document.fullscreenElement && document.exitFullscreen(); } catch(e){}
+  }
+  $("#menuBtn").onclick = goBack;
+  document.querySelectorAll(".backBtn").forEach(b => b.onclick = goBack);
+  window.addEventListener("keydown", e => { if (e.key === "Escape" && phase !== "menu") goBack(); });
+  $("#recalBtn").onclick = () => {
+    dir = 0; try { localStorage.removeItem("fg_dir"); } catch(e){}
+    $("#recalBtn").textContent = "✔ Will recalibrate next game";
+  };
+  // Live sensor status on the menu (helps diagnose browsers that block sensors)
+  setInterval(() => {
+    if (phase !== "menu") return;
+    const ua = navigator.userAgent;
+    const note = !isSecureContext ? "⚠ Not HTTPS: motion sensors are blocked on this page."
+      : sensorOn ? "✔ Motion sensor working (reading " + z.toFixed(2) + ")"
+      : "Sensor: no data yet (move your phone). " + (/Firefox/.test(ua) ? "Firefox: see tips below." : "");
+    $("#sensorNote").textContent = note;
+  }, 300);
+})();
+</script>
+</body>
+</html>
