@@ -1,6 +1,6 @@
 // Service worker: lets the game install as an app and work offline.
 // Bump CACHE when you want every phone to drop its old copy.
-const CACHE = "forehead-game-v1";
+const CACHE = "forehead-game-v2";
 const ASSETS = [
   "./",
   "index.html",

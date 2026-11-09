@@ -516,7 +516,7 @@
   $("#apiKey").value = store.get("fg_gemini_key", "");
   $("#genModel").value = store.get("fg_model", "");
   $("#apiKey").onchange = () => store.set("fg_gemini_key", $("#apiKey").value.trim());
-  $("#genModel").onchange = () => { store.set("fg_model", $("#genModel").value.trim()); store.del("fg_model_auto"); };
+  $("#genModel").onchange = () => { store.set("fg_model", $("#genModel").value.trim()); store.del("fg_models_auto"); };
   $("#genOpenBtn").onclick = () => { phase = "gen"; show("gen"); };
 
   const gstat = (msg, cls="") => { const e = $("#genStatus"); e.textContent = msg; e.className = "status " + cls; };
@@ -565,30 +565,43 @@ Return JSON only, in the form {"entries": ["...", "..."]}.`;
     return cleanEntries(text.split(/\r?\n/));      // fallback if the model ignored the JSON format
   }
 
-  async function pickModel(key){
+  // Ranked list of usable models: fast Flash-Lite first, then Flash; newer and stable versions first.
+  async function pickModels(key){
     const r = await fetch(API + "/models?pageSize=200&key=" + encodeURIComponent(key));
-    if (!r.ok) throw new Error("Could not list models (" + r.status + ")");
+    if (!r.ok) { const e = new Error("Could not list models (" + r.status + ")"); e.status = r.status; throw e; }
     const data = await r.json();
     const cands = (data.models || []).filter(m =>
       (m.supportedGenerationMethods || []).includes("generateContent") &&
       /^models\/gemini-\d/.test(m.name) && /flash/.test(m.name) &&
       !/image|tts|audio|live|embedding|robotics|computer|thinking|native|vision|learnlm|-exp/.test(m.name));
-    const rank = m => [parseFloat((m.name.match(/gemini-(\d+(?:\.\d+)?)/) || [0,0])[1]),
-                       /lite/.test(m.name) ? 1 : 0, /preview/.test(m.name) ? 0 : 1];
+    const rank = m => [/lite/.test(m.name) ? 1 : 0, /preview/.test(m.name) ? 0 : 1,
+                       parseFloat((m.name.match(/gemini-(\d+(?:\.\d+)?)/) || [0,0])[1])];
     cands.sort((x, y) => { const a = rank(x), b = rank(y); return b[0]-a[0] || b[1]-a[1] || b[2]-a[2]; });
     if (!cands.length) throw new Error("No usable Gemini model found for this key");
-    return cands[0].name.replace(/^models\//, "");
+    return cands.slice(0, 4).map(m => m.name.replace(/^models\//, ""));
   }
 
-  async function callGemini(key, model, prompt, signal){
+  // Thinking models spend most of their time "thinking" before answering, which is slow and useless for
+  // a word list. We ask for no/minimal thinking; models that don't accept a setting make us fall to the next one.
+  // Request variants, tried in order. Google's 400 error is often just "invalid argument" with no hint
+  // about which setting the model dislikes, so ANY 400 (except a bad key) moves on to the next variant.
+  const THINK = [
+    { think: { thinkingBudget: 0 } },
+    { think: { thinkingLevel: "minimal" } },
+    { think: { thinkingLevel: "low" } },
+    { think: null },
+    { think: null, plain: true }          // last resort: no thinking setting and no response schema
+  ];
+  async function callGemini(key, model, prompt, v){
     const res = await fetch(API + "/models/" + encodeURIComponent(model) + ":generateContent?key=" + encodeURIComponent(key), {
-      method: "POST", signal,
+      method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 1, maxOutputTokens: 8192, responseMimeType: "application/json",
-          responseSchema: { type: "OBJECT", properties: { entries: { type: "ARRAY", items: { type: "STRING" } } }, required: ["entries"] }
+          ...(v.think ? { thinkingConfig: v.think } : {}),
+          ...(v.plain ? {} : { responseSchema: { type: "OBJECT", properties: { entries: { type: "ARRAY", items: { type: "STRING" } } }, required: ["entries"] } })
         }
       })
     });
@@ -602,15 +615,18 @@ Return JSON only, in the form {"entries": ["...", "..."]}.`;
   }
 
   function friendly(e){
-    if (e.name === "AbortError") return "Timed out after 90 seconds. Try again, or ask for fewer entries.";
-    if (e instanceof TypeError) return "Network error. Check your connection, or whether an ad blocker is blocking requests to Google.";
+    const tech = " [" + (e.name || "Error") + ": " + (e.message || "") + (e.status ? ", HTTP " + e.status : "") + "]";
+    if (e.name === "TimeoutError") return "Every model we tried took too long (45 seconds each). Google\'s free tier may be overloaded: try again in a minute, ask for fewer entries, or type a model name under Advanced.";
+    if (!e.status && (e instanceof TypeError || e.name === "NetworkError" || /NetworkError|Failed to fetch|Load failed|fetch resource/i.test(e.message || "")))
+      return "Could not reach Google's Gemini server from this browser. Usual causes: an ad blocker, tracking protection or private DNS blocking generativelanguage.googleapis.com, a VPN, or no connection. Try a private tab or another browser to compare." + tech;
     if (e.status === 400 && /api key/i.test(e.message)) return "Gemini rejected the API key. Check that you pasted all of it.";
     if (e.status === 401 || e.status === 403) return "Access denied (" + e.message + ")";
     if (e.status === 429) return "Free-tier rate limit or daily quota reached. Wait a minute and try again.";
-    return e.message || String(e);
+    return (e.message || String(e)) + tech;
   }
 
   let genRun = 0;
+  const TMO = 45000;       // per attempt: a model that is this slow gets skipped for the next one
   $("#genBtn").onclick = async () => {
     const my = ++genRun;
     const key = $("#apiKey").value.trim();
@@ -621,24 +637,42 @@ Return JSON only, in the form {"entries": ["...", "..."]}.`;
     if (!theme) return gstat("Type a theme first.", "err");
     store.set("fg_gemini_key", key);
     const btn = $("#genBtn"); btn.disabled = true; btn.textContent = "Generating…";
-    const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 90000);
+    // Live status line with an elapsed-seconds counter
+    const t0 = Date.now(); let msg = "Starting…";
+    const paint = () => gstat(msg + " (" + Math.round((Date.now() - t0) / 1000) + "s)");
+    const prog = m => { msg = m; paint(); };
+    const tick = setInterval(paint, 1000);
+    // No AbortSignal on purpose: Firefox can't pass it through the service worker ("could not be cloned")
+    let timer;
+    const withTimeout = p => Promise.race([p, new Promise((_, rej) => {
+      timer = setTimeout(() => { const t = new Error("timeout"); t.name = "TimeoutError"; rej(t); }, TMO);
+    })]);
+    const manual = $("#genModel").value.trim();
+    const loadModels = async () => {
+      prog("Looking for available Gemini models…");
+      try { const l = await pickModels(key); store.set("fg_models_auto", JSON.stringify(l)); return l; }
+      catch(e){ if (e.status) throw e; return ["gemini-2.5-flash-lite", "gemini-2.5-flash"]; }
+    };
+    let model = "";
     try {
-      let model = $("#genModel").value.trim() || store.get("fg_model_auto");
-      if (!model) {
-        gstat("Looking for an available Gemini model…");
-        try { model = await pickModel(key); store.set("fg_model_auto", model); } catch(e){ if (e.status) throw e; model = "gemini-2.5-flash"; }
-      }
+      let models;
+      if (manual) models = [manual];
+      else { try { models = JSON.parse(store.get("fg_models_auto", "null")); } catch(e){} if (!Array.isArray(models) || !models.length) models = await loadModels(); }
       const total = want + Math.ceil(want * 0.15);          // ask for extra, duplicates get removed then we trim
-      let text, tries = 0, redetected = false;
+      let text, tries = 0, redetected = false, mi = 0;
+      let ti = Math.min(THINK.length - 1, parseInt(store.get("fg_think", "0"), 10) || 0);
       for (;;) {
-        gstat("Asking " + model + " for " + want + " entries…");
-        try { text = await callGemini(key, model, buildPrompt(theme, total), ctl.signal); break; }
+        model = models[mi];
+        prog("Asking " + model + " for " + want + " entries…");
+        try { text = await withTimeout(callGemini(key, model, buildPrompt(theme, total), THINK[ti])); clearTimeout(timer); store.set("fg_think", String(ti)); break; }
         catch(e){
-          if (e.status === 404 && !redetected && !$("#genModel").value.trim()) {     // cached model was retired
-            redetected = true; store.del("fg_model_auto");
-            model = await pickModel(key); store.set("fg_model_auto", model); continue;
+          clearTimeout(timer);
+          if (e.status === 400 && !/api key/i.test(e.message) && ti < THINK.length - 1) { ti++; prog("Trying a different request format…"); continue; }
+          if (e.status === 404 && !manual && !redetected) {          // cached model list is out of date
+            redetected = true; store.del("fg_models_auto"); models = await loadModels(); mi = 0; continue;
           }
-          if ((e.status === 500 || e.status === 503) && ++tries < 3) { gstat("Gemini is busy, retrying…"); await sleep(1500 * tries); continue; }
+          if (e.name === "TimeoutError" && mi < models.length - 1) { mi++; prog(model + " is too slow, trying " + models[mi] + "…"); continue; }
+          if ((e.status === 500 || e.status === 503) && ++tries < 3) { prog("Gemini is busy, retrying…"); await sleep(1500 * tries); continue; }
           throw e;
         }
       }
@@ -649,12 +683,12 @@ Return JSON only, in the form {"entries": ["...", "..."]}.`;
       $("#genList").value = entries.join("\n");
       updateGenCount();
       $("#genOut").classList.add("on");
-      gstat("Done with " + model + ". Review the list below, remove anything you don't like, then save.", "ok");
+      gstat("Done in " + Math.round((Date.now() - t0) / 1000) + "s with " + model + ". Review the list below, remove anything you don't like, then save.", "ok");
       $("#genOut").scrollIntoView({ behavior: "smooth", block: "start" });
     } catch(e){
       if (my === genRun) gstat(friendly(e), "err");
     } finally {
-      clearTimeout(timer); btn.disabled = false; btn.textContent = "Generate";
+      clearTimeout(timer); clearInterval(tick); btn.disabled = false; btn.textContent = "Generate";
     }
   };
 
