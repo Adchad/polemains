@@ -22,7 +22,23 @@
   .card{width:100%;max-width:420px;display:flex;flex-direction:column;gap:12px}
   label{display:flex;flex-direction:column;gap:6px;text-align:left;font-size:.9rem;opacity:.9}
   select,textarea,input[type=number]{width:100%;padding:12px;border-radius:12px;border:1px solid #374151;background:#1f2937;color:#fff;font-size:1rem}
+  input[type=text],input[type=password]{width:100%;padding:12px;border-radius:12px;border:1px solid #374151;background:#1f2937;color:#fff;font-size:1rem}
+  input,textarea{user-select:text;-webkit-user-select:text}
   textarea{min-height:90px;resize:vertical}
+  a{color:#86efac}
+  .screen.scroll{justify-content:flex-start}
+  .screen.scroll>.card{margin:auto}
+  .backBtn.inline{position:static;align-self:flex-start}
+  .tools{display:none;gap:8px}.tools.on{display:flex}.tools>button{flex:1;padding:8px;font-size:.9rem}
+  .chk{flex-direction:row;align-items:center;gap:10px;font-size:.9rem}
+  .chk input{width:auto}
+  .status{min-height:1.2em;font-size:.95rem;text-align:left;opacity:.9;white-space:pre-wrap}
+  .status.err{color:#fca5a5}.status.ok{color:#86efac}
+  details{text-align:left;font-size:.9rem}
+  summary{cursor:pointer;opacity:.8;margin-bottom:8px}
+  #genOut{display:none;flex-direction:column;gap:10px}#genOut.on{display:flex}
+  #genList{min-height:200px;font-size:.9rem}
+  button:disabled{opacity:.5;cursor:default}
   button{padding:16px;border:0;border-radius:14px;font-size:1.15rem;font-weight:700;background:#22c55e;color:#052e16;cursor:pointer}
   button.secondary{background:#374151;color:#f9fafb;font-weight:600;font-size:1rem;padding:12px}
   .big{font-size:min(16vw,26vh);font-weight:800;line-height:1.05;word-break:break-word;padding:0 4vw}
@@ -47,22 +63,67 @@
 <body>
 
 <!-- MENU -->
-<section id="menu" class="screen active">
+<section id="menu" class="screen scroll active">
   <div class="card">
     <h1>🤯 Forehead Game</h1>
-    <p class="sub">Phone on your forehead. Tilt <b>down</b> = got it, tilt <b>up</b> = pass.</p>
+    <p class="sub">Phone on your forehead. Tilt <b>down</b> = got it, tilt <b>up</b> = pass.<br>You can also tap the <b>bottom</b> half of the screen = got it, <b>top</b> half = pass.</p>
     <label>Deck
       <select id="deck"></select>
     </label>
+    <div class="tools" id="themeTools">
+      <button class="secondary" id="exportBtn">⬇ Export</button>
+      <button class="secondary" id="deleteBtn">🗑 Delete</button>
+    </div>
+    <p class="status" id="menuNote"></p>
     <label id="customWrap" style="display:none">Your words (comma or new line separated)
       <textarea id="custom" placeholder="pizza, Eiffel Tower, karaoke..."></textarea>
     </label>
+    <button class="secondary" id="genOpenBtn">✨ Generate a theme with AI</button>
     <label>Round length (seconds)
       <input type="number" id="secs" value="60" min="15" max="300" step="5">
     </label>
+    <label class="chk"><input type="checkbox" id="touchOn" checked> Tap the screen to answer (bottom = correct, top = pass)</label>
     <button id="startBtn">Start</button>
     <button class="secondary" id="recalBtn">Recalibrate tilt direction next game</button>
     <p class="small" id="sensorNote"></p>
+  </div>
+</section>
+
+<!-- AI THEME GENERATOR -->
+<section id="gen" class="screen scroll">
+  <div class="card">
+    <button class="secondary backBtn inline" aria-label="Back">← Back</button>
+    <h1 style="font-size:1.5rem">✨ Generate a theme</h1>
+    <label>Gemini API key
+      <input type="password" id="apiKey" placeholder="AIza..." autocomplete="off" autocapitalize="off" spellcheck="false">
+    </label>
+    <p class="status" style="opacity:.7;margin:0">Free key from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>. It is saved only in this browser and sent only to Google.</p>
+    <label>Theme (a word or a phrase)
+      <input type="text" id="genTheme" placeholder="e.g. 90s cartoons, French rappers, things in a kitchen" maxlength="200" autocomplete="off">
+    </label>
+    <label>Number of entries
+      <input type="number" id="genCount" value="150" min="10" max="500" step="10">
+    </label>
+    <details>
+      <summary>Advanced</summary>
+      <label>Model (leave empty to pick one automatically)
+        <input type="text" id="genModel" placeholder="auto" autocapitalize="off" spellcheck="false">
+      </label>
+    </details>
+    <button id="genBtn">Generate</button>
+    <p class="status" id="genStatus"></p>
+    <div id="genOut">
+      <label>Theme name
+        <input type="text" id="genName" maxlength="40" autocomplete="off">
+      </label>
+      <label><span id="genCountLbl">Entries</span> (one per line, edit freely)
+        <textarea id="genList"></textarea>
+      </label>
+      <div class="row">
+        <button id="genSaveBtn">Save theme</button>
+        <button class="secondary" id="genDiscardBtn">Discard</button>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -82,7 +143,7 @@
 </section>
 
 <!-- RESULTS -->
-<section id="results" class="screen">
+<section id="results" class="screen scroll">
   <div class="card">
     <p class="sub">Time's up!</p>
     <p class="score" id="finalScore">0</p>
@@ -115,22 +176,75 @@
     DECKS[name] = txt.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
 
   const $ = s => document.querySelector(s);
-  const screens = ["menu","prep","game","results"];
+  const screens = ["menu","gen","prep","game","results"];
   const show = id => screens.forEach(s => $("#"+s).classList.toggle("active", s===id));
   const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const store = {
+    get(k, d=null){ try { const v = localStorage.getItem(k); return v === null ? d : v; } catch(e){ return d; } },
+    set(k, v){ try { localStorage.setItem(k, v); return true; } catch(e){ return false; } },
+    del(k){ try { localStorage.removeItem(k); } catch(e){} }
+  };
+
+  /* ---------- User themes (saved in this browser) ---------- */
+  const UK = "fg_user_themes";
+  let USER = {};
+  try { USER = JSON.parse(store.get(UK, "{}")) || {}; } catch(e){ USER = {}; }
+  function saveUser(){
+    const ok = store.set(UK, JSON.stringify(USER));
+    try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch(e){}
+    return ok;
+  }
 
   /* ---------- Deck UI ---------- */
   const deckSel = $("#deck");
   const CUSTOM = "__custom__";
-  Object.keys(DECKS).forEach(k => deckSel.add(new Option(k + " (" + DECKS[k].length + ")", k)));
-  deckSel.add(new Option("Custom words…", CUSTOM));
-  try {
-    $("#custom").value = localStorage.getItem("fg_custom") || "";
-    const saved = localStorage.getItem("fg_deck");
-    if (saved && [...deckSel.options].some(o => o.value === saved)) deckSel.value = saved;
-  } catch(e){}
-  const syncCustom = () => $("#customWrap").style.display = deckSel.value === CUSTOM ? "flex" : "none";
-  deckSel.onchange = syncCustom; syncCustom();
+  function rebuildDecks(want){
+    deckSel.innerHTML = "";
+    const g1 = document.createElement("optgroup"); g1.label = "Built-in themes";
+    Object.keys(DECKS).forEach(k => g1.appendChild(new Option(k + " (" + DECKS[k].length + ")", "b:" + k)));
+    deckSel.appendChild(g1);
+    const users = Object.keys(USER);
+    if (users.length) {
+      const g2 = document.createElement("optgroup"); g2.label = "My themes";
+      users.forEach(k => g2.appendChild(new Option(k + " (" + USER[k].length + ")", "u:" + k)));
+      deckSel.appendChild(g2);
+    }
+    deckSel.appendChild(new Option("Custom words…", CUSTOM));
+    const has = v => v && [...deckSel.options].some(o => o.value === v);
+    let v = want || store.get("fg_deck");
+    if (!has(v) && has("b:" + v)) v = "b:" + v;      // old saved value without prefix
+    if (has(v)) deckSel.value = v;
+    syncDeck();
+  }
+  function syncDeck(){
+    $("#customWrap").style.display = deckSel.value === CUSTOM ? "flex" : "none";
+    $("#themeTools").classList.toggle("on", deckSel.value.startsWith("u:"));
+  }
+  deckSel.onchange = () => { $("#menuNote").textContent = ""; syncDeck(); };
+  $("#custom").value = store.get("fg_custom", "");
+  rebuildDecks();
+
+  $("#touchOn").checked = store.get("fg_touch", "1") !== "0";
+  $("#touchOn").onchange = e => store.set("fg_touch", e.target.checked ? "1" : "0");
+
+  const slug = n => n.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"") || "theme";
+  $("#exportBtn").onclick = () => {
+    const name = deckSel.value.slice(2), list = USER[name]; if (!list) return;
+    const txt = "// Exported from Forehead Game. Put this file in lists/ and add a <script src> tag for it in index.html.\n" +
+      "(window.LISTS = window.LISTS || {})[" + JSON.stringify(name) + "] = `\n" + list.join("\n") + "\n`;\n";
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([txt], { type: "text/javascript" }));
+    a.download = slug(name) + ".js";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    $("#menuNote").className = "status ok"; $("#menuNote").textContent = "Exported " + a.download;
+  };
+  $("#deleteBtn").onclick = () => {
+    const name = deckSel.value.slice(2);
+    if (!USER[name] || !confirm('Delete your theme "' + name + '"?')) return;
+    delete USER[name]; saveUser(); rebuildDecks();
+    $("#menuNote").className = "status"; $("#menuNote").textContent = 'Deleted "' + name + '".';
+  };
 
   /* ---------- Sensor ---------- */
   let z = 0;                 // latest gravity along screen normal, in g (≈ -1..1)
@@ -193,7 +307,9 @@
       try { localStorage.setItem("fg_custom", txt); } catch(e){}
       return txt.split(/[,\n]/).map(s => s.trim()).filter(Boolean);
     }
-    return DECKS[deckSel.value] || [];
+    const v = deckSel.value;
+    if (v.startsWith("u:")) return USER[v.slice(2)] || [];
+    return DECKS[v.slice(2)] || [];
   }
 
   /* ---------- Feedback (sound / vibration) ---------- */
@@ -272,7 +388,7 @@
     const nap = async ms => { await sleep(ms); if (my !== run) throw CANCEL; };
     words = getWords();
     if (words.length < 3) { alert("Need at least 3 words in the deck."); return; }
-    try { localStorage.setItem("fg_deck", deckSel.value); } catch(e){}
+    store.set("fg_deck", deckSel.value);
 
     // Must be called directly from the tap (iOS permission + fullscreen)
     const permP = (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function")
@@ -292,6 +408,7 @@
       neutral = 0;
       $("#prepMsg").textContent = "No motion sensor found";
       $("#prepSub").textContent = sensorWhy + "  Touch mode: tap the bottom half = correct, top half = pass.";
+      $("#touchOn").checked = true;
       await nap(5000);
     } else {
       // 1. Put on forehead, sample neutral pose
@@ -384,7 +501,7 @@
 
   /* ---------- Touch / keyboard fallback ---------- */
   $("#game").addEventListener("pointerdown", e => {
-    if (!touchMode || e.target.closest(".backBtn")) return;
+    if (!(touchMode || $("#touchOn").checked) || e.target.closest(".backBtn")) return;
     answer(e.clientY > innerHeight / 2 ? "ok" : "pass");
   });
   window.addEventListener("keydown", e => {
@@ -393,11 +510,178 @@
     if (e.key === "ArrowUp") answer("pass");
   });
 
+
+  /* ---------- AI theme generator (Gemini, called straight from the browser) ---------- */
+  const API = "https://generativelanguage.googleapis.com/v1beta";
+  $("#apiKey").value = store.get("fg_gemini_key", "");
+  $("#genModel").value = store.get("fg_model", "");
+  $("#apiKey").onchange = () => store.set("fg_gemini_key", $("#apiKey").value.trim());
+  $("#genModel").onchange = () => { store.set("fg_model", $("#genModel").value.trim()); store.del("fg_model_auto"); };
+  $("#genOpenBtn").onclick = () => { phase = "gen"; show("gen"); };
+
+  const gstat = (msg, cls="") => { const e = $("#genStatus"); e.textContent = msg; e.className = "status " + cls; };
+
+  // The prompt: this is what decides the quality of the lists.
+  function buildPrompt(theme, total){
+    return `You are writing the word list for a party guessing game (like Heads Up! or charades). One player holds a phone on their forehead; their friends give spoken clues or act things out until that player guesses the word on the screen.
+
+THEME: ${JSON.stringify(theme)}
+
+Write ${total} different entries that belong to this theme.
+
+Requirements:
+1. Guessable: every entry must be something most players would recognise and be able to describe or act out. Prefer well-known, specific things over obscure ones. If the theme is niche, stick to the best-known items of that niche.
+2. Format: each entry is a name or short phrase of 1 to 5 words, in its most common form. No numbering, explanations, parentheses, quotes or notes, and no years unless they are part of the name.
+3. Distinct: no duplicates or near-duplicates (the same thing spelled differently, or many sequels or variants of one thing).
+4. Difficulty mix: roughly 50% easy, 35% medium, 15% hard.
+5. Breadth: cover the whole theme and its different sub-areas instead of clustering on one. Put the entries in random order.
+6. Language: write the entries in the same language as the theme (a theme written in French gets French entries), except for names or titles that are normally kept in their original language.
+7. Real and accurate: only include things that really exist, unless the theme is explicitly fictional. Never invent entries.
+8. Keep everything suitable for a general audience: no slurs, no graphic or sexual content.
+9. If the theme is ambiguous, choose the most common reading for a party game.
+
+Return JSON only, in the form {"entries": ["...", "..."]}.`;
+  }
+
+  const norm = e => e.normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+  function cleanEntries(arr){
+    const seen = new Set(), out = [];
+    for (let e of arr) {
+      if (typeof e !== "string") continue;
+      e = e.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "").replace(/[`\\"“”]/g, "").replace(/\$\{/g, "").replace(/\s+/g, " ").trim();
+      if (!e || e.length > 60) continue;
+      const k = norm(e) || e.toLowerCase();
+      if (seen.has(k)) continue;
+      seen.add(k); out.push(e);
+    }
+    return out;
+  }
+  function parseEntries(text){
+    try {
+      const j = JSON.parse(text);
+      const a = Array.isArray(j) ? j : (j && Array.isArray(j.entries) ? j.entries : null);
+      if (a) return cleanEntries(a);
+    } catch(e){}
+    return cleanEntries(text.split(/\r?\n/));      // fallback if the model ignored the JSON format
+  }
+
+  async function pickModel(key){
+    const r = await fetch(API + "/models?pageSize=200&key=" + encodeURIComponent(key));
+    if (!r.ok) throw new Error("Could not list models (" + r.status + ")");
+    const data = await r.json();
+    const cands = (data.models || []).filter(m =>
+      (m.supportedGenerationMethods || []).includes("generateContent") &&
+      /^models\/gemini-\d/.test(m.name) && /flash/.test(m.name) &&
+      !/image|tts|audio|live|embedding|robotics|computer|thinking|native|vision|learnlm|-exp/.test(m.name));
+    const rank = m => [parseFloat((m.name.match(/gemini-(\d+(?:\.\d+)?)/) || [0,0])[1]),
+                       /lite/.test(m.name) ? 1 : 0, /preview/.test(m.name) ? 0 : 1];
+    cands.sort((x, y) => { const a = rank(x), b = rank(y); return b[0]-a[0] || b[1]-a[1] || b[2]-a[2]; });
+    if (!cands.length) throw new Error("No usable Gemini model found for this key");
+    return cands[0].name.replace(/^models\//, "");
+  }
+
+  async function callGemini(key, model, prompt, signal){
+    const res = await fetch(API + "/models/" + encodeURIComponent(model) + ":generateContent?key=" + encodeURIComponent(key), {
+      method: "POST", signal,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 1, maxOutputTokens: 8192, responseMimeType: "application/json",
+          responseSchema: { type: "OBJECT", properties: { entries: { type: "ARRAY", items: { type: "STRING" } } }, required: ["entries"] }
+        }
+      })
+    });
+    let data = null; try { data = await res.json(); } catch(e){}
+    if (!res.ok) { const err = new Error((data && data.error && data.error.message) || res.statusText); err.status = res.status; throw err; }
+    const cand = data && data.candidates && data.candidates[0];
+    if (!cand) throw new Error("Gemini refused this theme" + (data && data.promptFeedback && data.promptFeedback.blockReason ? " (" + data.promptFeedback.blockReason + ")" : "") + ". Try rewording it.");
+    const text = ((cand.content && cand.content.parts) || []).map(p => p.text || "").join("");
+    if (!text) throw new Error("Gemini returned an empty answer (" + (cand.finishReason || "unknown reason") + ").");
+    return text;
+  }
+
+  function friendly(e){
+    if (e.name === "AbortError") return "Timed out after 90 seconds. Try again, or ask for fewer entries.";
+    if (e instanceof TypeError) return "Network error. Check your connection, or whether an ad blocker is blocking requests to Google.";
+    if (e.status === 400 && /api key/i.test(e.message)) return "Gemini rejected the API key. Check that you pasted all of it.";
+    if (e.status === 401 || e.status === 403) return "Access denied (" + e.message + ")";
+    if (e.status === 429) return "Free-tier rate limit or daily quota reached. Wait a minute and try again.";
+    return e.message || String(e);
+  }
+
+  let genRun = 0;
+  $("#genBtn").onclick = async () => {
+    const my = ++genRun;
+    const key = $("#apiKey").value.trim();
+    const theme = $("#genTheme").value.replace(/\s+/g, " ").trim();
+    const want = Math.max(10, Math.min(500, parseInt($("#genCount").value, 10) || 150));
+    $("#genOut").classList.remove("on");
+    if (!key) return gstat("Paste your Gemini API key first.", "err");
+    if (!theme) return gstat("Type a theme first.", "err");
+    store.set("fg_gemini_key", key);
+    const btn = $("#genBtn"); btn.disabled = true; btn.textContent = "Generating…";
+    const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 90000);
+    try {
+      let model = $("#genModel").value.trim() || store.get("fg_model_auto");
+      if (!model) {
+        gstat("Looking for an available Gemini model…");
+        try { model = await pickModel(key); store.set("fg_model_auto", model); } catch(e){ if (e.status) throw e; model = "gemini-2.5-flash"; }
+      }
+      const total = want + Math.ceil(want * 0.15);          // ask for extra, duplicates get removed then we trim
+      let text, tries = 0, redetected = false;
+      for (;;) {
+        gstat("Asking " + model + " for " + want + " entries…");
+        try { text = await callGemini(key, model, buildPrompt(theme, total), ctl.signal); break; }
+        catch(e){
+          if (e.status === 404 && !redetected && !$("#genModel").value.trim()) {     // cached model was retired
+            redetected = true; store.del("fg_model_auto");
+            model = await pickModel(key); store.set("fg_model_auto", model); continue;
+          }
+          if ((e.status === 500 || e.status === 503) && ++tries < 3) { gstat("Gemini is busy, retrying…"); await sleep(1500 * tries); continue; }
+          throw e;
+        }
+      }
+      if (my !== genRun) return;
+      const entries = parseEntries(text).slice(0, want);
+      if (entries.length < 3) throw new Error("Gemini did not return a usable list. Try again or reword the theme.");
+      $("#genName").value = theme.length > 40 ? theme.slice(0, 40).trim() : theme;
+      $("#genList").value = entries.join("\n");
+      updateGenCount();
+      $("#genOut").classList.add("on");
+      gstat("Done with " + model + ". Review the list below, remove anything you don't like, then save.", "ok");
+      $("#genOut").scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch(e){
+      if (my === genRun) gstat(friendly(e), "err");
+    } finally {
+      clearTimeout(timer); btn.disabled = false; btn.textContent = "Generate";
+    }
+  };
+
+  const listFromBox = () => cleanEntries($("#genList").value.split(/\r?\n/));
+  const updateGenCount = () => { $("#genCountLbl").textContent = "Entries (" + listFromBox().length + ")"; };
+  $("#genList").oninput = updateGenCount;
+  $("#genDiscardBtn").onclick = () => { $("#genOut").classList.remove("on"); gstat(""); };
+  $("#genSaveBtn").onclick = () => {
+    const list = listFromBox();
+    let name = $("#genName").value.replace(/\s+/g, " ").trim().slice(0, 40);
+    if (!name) return gstat("Give the theme a name.", "err");
+    if (list.length < 3) return gstat("A theme needs at least 3 entries.", "err");
+    const base = name; for (let i = 2; USER[name]; i++) name = base + " " + i;      // never overwrite an older theme
+    USER[name] = list;
+    const ok = saveUser();
+    rebuildDecks("u:" + name); store.set("fg_deck", "u:" + name);
+    $("#genOut").classList.remove("on"); gstat(""); phase = "menu"; show("menu");
+    $("#menuNote").className = "status " + (ok ? "ok" : "err");
+    $("#menuNote").textContent = ok ? '✔ Saved "' + name + '" (' + list.length + " entries) under My themes."
+      : '⚠ Could not save to this browser (private mode?). "' + name + '" is usable until you close the page; use Export to keep it.';
+  };
+
   /* ---------- Buttons ---------- */
   $("#startBtn").onclick = start;
   $("#againBtn").onclick = start;
   function goBack(){
-    run++; phase = "menu"; lock = false;
+    run++; genRun++; phase = "menu"; lock = false;
     $("#game").classList.remove("ok","pass");
     show("menu");
     try { wakeLock && wakeLock.release(); wakeLock = null; } catch(e){}
@@ -405,7 +689,7 @@
   }
   $("#menuBtn").onclick = goBack;
   document.querySelectorAll(".backBtn").forEach(b => b.onclick = goBack);
-  window.addEventListener("keydown", e => { if (e.key === "Escape" && phase !== "menu") goBack(); });
+  window.addEventListener("keydown", e => { if (e.key === "Escape" && phase !== "menu" && !(e.target && e.target.tagName === "INPUT")) goBack(); });
   $("#recalBtn").onclick = () => {
     dir = 0; try { localStorage.removeItem("fg_dir"); } catch(e){}
     $("#recalBtn").textContent = "✔ Will recalibrate next game";
