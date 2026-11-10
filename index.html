@@ -39,6 +39,7 @@
   #genOut{display:none;flex-direction:column;gap:10px}#genOut.on{display:flex}
   #genList{min-height:200px;font-size:.9rem}
   button:disabled{opacity:.5;cursor:default}
+  select.on{border-color:#22c55e;box-shadow:0 0 0 1px #22c55e}
   button{padding:16px;border:0;border-radius:14px;font-size:1.15rem;font-weight:700;background:#22c55e;color:#052e16;cursor:pointer}
   button.secondary{background:#374151;color:#f9fafb;font-weight:600;font-size:1rem;padding:12px}
   .big{font-size:min(16vw,26vh);font-weight:800;line-height:1.05;word-break:break-word;padding:0 4vw}
@@ -50,6 +51,7 @@
   #hud{position:absolute;top:max(10px,env(safe-area-inset-top));left:0;right:0;display:flex;justify-content:space-between;padding:0 20px;font-size:1.4rem;font-weight:700;opacity:.85;pointer-events:none}
   #hud span:first-child{margin-left:96px}
   .backBtn{position:absolute;top:max(10px,env(safe-area-inset-top));left:12px;z-index:5;padding:8px 14px;font-size:.95rem;font-weight:600;border-radius:10px;background:rgba(55,65,81,.85);color:#f9fafb}
+  .finishBtn{position:absolute;right:12px;bottom:max(12px,env(safe-area-inset-bottom));z-index:5;padding:8px 14px;font-size:.95rem;font-weight:600;border-radius:10px;background:rgba(55,65,81,.85)}
   #rotate{display:none;position:absolute;bottom:14px;font-size:.9rem;opacity:.7}
   @media (orientation:portrait){#rotate{display:block}}
   ul.res{list-style:none;padding:0;margin:0;text-align:left;max-height:34vh;overflow-y:auto;width:100%}
@@ -65,10 +67,13 @@
 <!-- MENU -->
 <section id="menu" class="screen scroll active">
   <div class="card">
-    <h1>🤯 Forehead Game</h1>
+    <h1>Forehead Game</h1>
     <p class="sub">Phone on your forehead. Tilt <b>down</b> = got it, tilt <b>up</b> = pass.<br>You can also tap the <b>bottom</b> half of the screen = got it, <b>top</b> half = pass.</p>
-    <label>Deck
-      <select id="deck"></select>
+    <label>Built-in themes
+      <select id="deckB"></select>
+    </label>
+    <label>My themes (AI &amp; custom)
+      <select id="deckU"></select>
     </label>
     <div class="tools" id="themeTools">
       <button class="secondary" id="exportBtn">⬇ Export</button>
@@ -78,16 +83,28 @@
     <label id="customWrap" style="display:none">Your words (comma or new line separated)
       <textarea id="custom" placeholder="pizza, Eiffel Tower, karaoke..."></textarea>
     </label>
-    <button class="secondary" id="genOpenBtn">✨ Generate a theme with AI</button>
+    <button id="startBtn">Start</button>
+    <div class="row">
+      <button class="secondary" id="genOpenBtn">✨ Generate a theme</button>
+      <button class="secondary" id="settingsBtn">⚙ Settings</button>
+    </div>
+  </div>
+</section>
+
+<!-- SETTINGS -->
+<section id="settings" class="screen scroll">
+  <div class="card">
+    <button class="secondary backBtn inline" aria-label="Back">← Back</button>
+    <h1 style="font-size:1.5rem">⚙ Settings</h1>
     <label>Round length (seconds)
-      <input type="number" id="secs" value="60" min="15" max="300" step="5">
+      <input type="number" id="secs" value="60" min="5" step="5" inputmode="numeric">
     </label>
+    <label class="chk"><input type="checkbox" id="unlimited"> No time limit (you end the round yourself)</label>
     <label>Tilt needed to answer: <b id="tiltVal">40°</b>
       <input type="range" id="tiltDeg" min="25" max="65" step="5" value="40">
       <span class="small" style="margin:0;font-size:.8rem">Lower = more sensitive. Raise it if it answers by accident.</span>
     </label>
     <label class="chk"><input type="checkbox" id="touchOn" checked> Tap the screen to answer (bottom = correct, top = pass)</label>
-    <button id="startBtn">Start</button>
     <button class="secondary" id="recalBtn">Recalibrate tilt direction next game</button>
     <p class="small" id="sensorNote"></p>
   </div>
@@ -141,6 +158,7 @@
 <!-- GAME -->
 <section id="game" class="screen">
   <button class="backBtn" aria-label="Back">← Back</button>
+  <button class="secondary finishBtn" id="finishBtn" style="display:none">Finish round</button>
   <div id="hud"><span id="timer">60</span><span id="score">0</span></div>
   <div class="big" id="word"></div>
   <div id="rotate">↻ Rotate your phone to landscape</div>
@@ -180,7 +198,7 @@
     DECKS[name] = txt.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
 
   const $ = s => document.querySelector(s);
-  const screens = ["menu","gen","prep","game","results"];
+  const screens = ["menu","settings","gen","prep","game","results"];
   const show = id => screens.forEach(s => $("#"+s).classList.toggle("active", s===id));
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const store = {
@@ -200,43 +218,55 @@
   }
 
   /* ---------- Deck UI ---------- */
-  const deckSel = $("#deck");
+  const deckB = $("#deckB"), deckU = $("#deckU");
   const CUSTOM = "__custom__";
+  let curDeck = "";              // the active theme: "b:<name>" (built-in), "u:<name>" (mine) or CUSTOM
   function rebuildDecks(want){
-    deckSel.innerHTML = "";
-    const g1 = document.createElement("optgroup"); g1.label = "Built-in themes";
-    Object.keys(DECKS).forEach(k => g1.appendChild(new Option(k + " (" + DECKS[k].length + ")", "b:" + k)));
-    deckSel.appendChild(g1);
-    const users = Object.keys(USER);
-    if (users.length) {
-      const g2 = document.createElement("optgroup"); g2.label = "My themes";
-      users.forEach(k => g2.appendChild(new Option(k + " (" + USER[k].length + ")", "u:" + k)));
-      deckSel.appendChild(g2);
-    }
-    deckSel.appendChild(new Option("Custom words…", CUSTOM));
-    const has = v => v && [...deckSel.options].some(o => o.value === v);
+    deckB.innerHTML = ""; deckU.innerHTML = "";
+    deckB.add(new Option("Pick a built-in theme…", ""));
+    Object.keys(DECKS).forEach(k => deckB.add(new Option(k + " (" + DECKS[k].length + ")", "b:" + k)));
+    deckU.add(new Option(Object.keys(USER).length ? "Pick one of my themes…" : "No AI themes yet", ""));
+    Object.keys(USER).forEach(k => deckU.add(new Option(k + " (" + USER[k].length + ")", "u:" + k)));
+    deckU.add(new Option("Type my own words…", CUSTOM));
+    const has = v => v && [...deckB.options, ...deckU.options].some(o => o.value === v);
     let v = want || store.get("fg_deck");
     if (!has(v) && has("b:" + v)) v = "b:" + v;      // old saved value without prefix
-    if (has(v)) deckSel.value = v;
+    if (!has(v)) v = Object.keys(DECKS).length ? "b:" + Object.keys(DECKS)[0] : "";
+    pickDeck(v);
+  }
+  // Choosing in one dropdown makes it the active one and clears the other.
+  function pickDeck(v){
+    curDeck = v || "";
+    deckB.value = curDeck.startsWith("b:") ? curDeck : "";
+    deckU.value = (curDeck.startsWith("u:") || curDeck === CUSTOM) ? curDeck : "";
+    deckB.classList.toggle("on", !!deckB.value);
+    deckU.classList.toggle("on", !!deckU.value);
     syncDeck();
   }
   function syncDeck(){
-    $("#customWrap").style.display = deckSel.value === CUSTOM ? "flex" : "none";
-    $("#themeTools").classList.toggle("on", deckSel.value.startsWith("u:"));
+    $("#customWrap").style.display = curDeck === CUSTOM ? "flex" : "none";
+    $("#themeTools").classList.toggle("on", curDeck.startsWith("u:"));
   }
-  deckSel.onchange = () => { $("#menuNote").textContent = ""; syncDeck(); };
+  const onDeckChange = e => { $("#menuNote").textContent = ""; pickDeck(e.target.value); store.set("fg_deck", curDeck); };
+  deckB.onchange = deckU.onchange = onDeckChange;
   $("#custom").value = store.get("fg_custom", "");
   rebuildDecks();
 
   $("#tiltDeg").value = store.get("fg_tilt", "40");
   $("#tiltVal").textContent = $("#tiltDeg").value + "°";
   $("#tiltDeg").oninput = e => { $("#tiltVal").textContent = e.target.value + "°"; store.set("fg_tilt", e.target.value); };
+  $("#secs").value = store.get("fg_secs", "60");
+  $("#secs").onchange = e => store.set("fg_secs", e.target.value);
+  const syncUnlimited = () => { $("#secs").disabled = $("#unlimited").checked; };
+  $("#unlimited").checked = store.get("fg_unlimited", "0") === "1"; syncUnlimited();
+  $("#unlimited").onchange = e => { store.set("fg_unlimited", e.target.checked ? "1" : "0"); syncUnlimited(); };
+  $("#settingsBtn").onclick = () => { phase = "settings"; show("settings"); };
   $("#touchOn").checked = store.get("fg_touch", "1") !== "0";
   $("#touchOn").onchange = e => store.set("fg_touch", e.target.checked ? "1" : "0");
 
   const slug = n => n.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"") || "theme";
   $("#exportBtn").onclick = () => {
-    const name = deckSel.value.slice(2), list = USER[name]; if (!list) return;
+    const name = curDeck.slice(2), list = USER[name]; if (!list) return;
     const txt = "// Exported from Forehead Game. Put this file in lists/ and add a <script src> tag for it in index.html.\n" +
       "(window.LISTS = window.LISTS || {})[" + JSON.stringify(name) + "] = `\n" + list.join("\n") + "\n`;\n";
     const a = document.createElement("a");
@@ -247,7 +277,7 @@
     $("#menuNote").className = "status ok"; $("#menuNote").textContent = "Exported " + a.download;
   };
   $("#deleteBtn").onclick = () => {
-    const name = deckSel.value.slice(2);
+    const name = curDeck.slice(2);
     if (!USER[name] || !confirm('Delete your theme "' + name + '"?')) return;
     delete USER[name]; saveUser(); rebuildDecks();
     $("#menuNote").className = "status"; $("#menuNote").textContent = 'Deleted "' + name + '".';
@@ -328,14 +358,14 @@
   const nextWord = () => { if (!queue.length) queue = shuffle(words.slice()); return queue.pop(); };
 
   function getWords(){
-    if (deckSel.value === CUSTOM) {
+    if (curDeck === CUSTOM) {
       const txt = $("#custom").value;
       try { localStorage.setItem("fg_custom", txt); } catch(e){}
       return txt.split(/[,\n]/).map(s => s.trim()).filter(Boolean);
     }
-    const v = deckSel.value;
+    const v = curDeck;
     if (v.startsWith("u:")) return USER[v.slice(2)] || [];
-    return DECKS[v.slice(2)] || [];
+    return v.startsWith("b:") ? (DECKS[v.slice(2)] || []) : [];
   }
 
   /* ---------- Feedback (sound / vibration) ---------- */
@@ -413,8 +443,9 @@
   async function startInner(my){
     const nap = async ms => { await sleep(ms); if (my !== run) throw CANCEL; };
     words = getWords();
+    if (!curDeck) { alert("Pick a theme first."); return; }
     if (words.length < 3) { alert("Need at least 3 words in the deck."); return; }
-    store.set("fg_deck", deckSel.value);
+    store.set("fg_deck", curDeck);
 
     // Must be called directly from the tap (iOS permission + fullscreen)
     const permP = (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function")
@@ -467,10 +498,22 @@
     beginRound();      // straight into the round: no 3-2-1
   }
 
+  let unlimitedRound = false, startAt = 0, finishArmed = false;
+  const fmtTime = n => n >= 60 ? Math.floor(n / 60) + ":" + String(n % 60).padStart(2, "0") : String(n);
+  $("#finishBtn").onclick = () => {                   // two taps, so a finger on the edge can't end the round
+    if (!finishArmed) {
+      finishArmed = true; $("#finishBtn").textContent = "Tap again to finish";
+      setTimeout(() => { finishArmed = false; $("#finishBtn").textContent = "Finish round"; }, 2500);
+    } else endRound();
+  };
   function beginRound(){
-    const secs = Math.max(15, Math.min(300, parseInt($("#secs").value, 10) || 60));
-    correct = []; passed = []; queue = []; armed = false; lock = false;
-    endAt = performance.now() + secs * 1000;
+    const secs = Math.max(5, parseInt($("#secs").value, 10) || 60);       // no upper limit
+    unlimitedRound = $("#unlimited").checked;
+    correct = []; passed = []; queue = []; armed = false; lock = false; holdDir = 0;
+    startAt = performance.now();
+    endAt = unlimitedRound ? Infinity : startAt + secs * 1000;
+    $("#finishBtn").style.display = unlimitedRound ? "block" : "none";
+    $("#finishBtn").textContent = "Finish round"; finishArmed = false;
     phase = "play";
     $("#score").textContent = 0;
     $("#word").textContent = nextWord();
@@ -498,6 +541,8 @@
 
   function endRound(){
     phase = "results";
+    $("#results .sub").textContent = unlimitedRound ? "Round over! (" + fmtTime(Math.floor((performance.now() - startAt) / 1000)) + ")" : "Time's up!";
+    $("#finishBtn").style.display = "none";
     beep(520, 0.4); buzz(400);
     $("#finalScore").textContent = correct.length;
     const ul = $("#resList"); ul.innerHTML = "";
@@ -515,9 +560,13 @@
   let holdDir = 0, holdSince = 0;
   setInterval(() => {
     if (phase !== "play") return;
-    const now = performance.now(), left = Math.max(0, endAt - now);
-    $("#timer").textContent = Math.ceil(left / 1000);
-    if (left <= 0) { endRound(); return; }
+    const now = performance.now();
+    if (unlimitedRound) $("#timer").textContent = fmtTime(Math.floor((now - startAt) / 1000));     // counts up
+    else {
+      const left = Math.max(0, endAt - now);
+      $("#timer").textContent = fmtTime(Math.ceil(left / 1000));
+      if (left <= 0) { endRound(); return; }
+    }
     if (touchMode || lock) { holdDir = 0; return; }
     const d = (ang - neutral) * dir;         // + = tilted down, − = tilted up (degrees)
     if (!armed) {
@@ -534,7 +583,7 @@
 
   /* ---------- Touch / keyboard fallback ---------- */
   $("#game").addEventListener("pointerdown", e => {
-    if (!(touchMode || $("#touchOn").checked) || e.target.closest(".backBtn")) return;
+    if (!(touchMode || $("#touchOn").checked) || e.target.closest(".backBtn") || e.target.closest(".finishBtn")) return;
     answer(e.clientY > innerHeight / 2 ? "ok" : "pass");
   });
   window.addEventListener("keydown", e => {
@@ -763,7 +812,7 @@ Return JSON only, in the form {"entries": ["...", "..."]}.`;
   };
   // Live sensor status on the menu (helps diagnose browsers that block sensors)
   setInterval(() => {
-    if (phase !== "menu") return;
+    if (phase !== "settings") return;
     const ua = navigator.userAgent;
     const note = !isSecureContext ? "⚠ Not HTTPS: motion sensors are blocked on this page."
       : sensorOn ? "✔ Motion sensor working (tilt " + Math.round(ang) + "°)"
