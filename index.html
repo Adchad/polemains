@@ -89,6 +89,7 @@
   ul.res li.p{border-left:5px solid #ef4444;opacity:.8}
   .score{font-size:4rem;font-weight:800;margin:0}
   .row{display:flex;gap:12px}.row>*{flex:1}
+  body.playing #settingsBtn{ display:none; }
 
   /* ---------- Warm editorial visual direction ---------- */
   :root{
@@ -353,7 +354,11 @@
 
   const $ = s => document.querySelector(s);
   const screens = ["menu","settings","gen","prep","game","results"];
-  const show = id => screens.forEach(s => $("#"+s).classList.toggle("active", s===id));
+  const show = id => {
+    screens.forEach(s => $("#"+s).classList.toggle("active", s===id));
+    // The cog makes no sense while the phone is on your forehead or during results cleanup.
+    document.body.classList.toggle("playing", id === "game" || id === "prep");
+  };
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const store = {
     get(k, d=null){ try { const v = localStorage.getItem(k); return v === null ? d : v; } catch(e){ return d; } },
