@@ -39,7 +39,31 @@
   #genOut{display:none;flex-direction:column;gap:10px}#genOut.on{display:flex}
   #genList{min-height:200px;font-size:.9rem}
   button:disabled{opacity:.5;cursor:default}
-  select.on{border-color:#22c55e;box-shadow:0 0 0 1px #22c55e}
+  .drawers{display:flex;flex-direction:column;gap:10px}
+  .drawer{border:1px solid #374151;border-radius:14px;background:#1f2937;overflow:hidden;text-align:left}
+  .dHead{width:100%;display:flex;align-items:center;gap:10px;padding:14px;background:transparent;color:#f9fafb;font-size:1rem;font-weight:700;border-radius:0;text-align:left}
+  .dHead .chev{transition:transform .15s;opacity:.8}
+  .drawer.open .chev{transform:rotate(90deg)}
+  .dSub{margin-left:auto;font-weight:500;opacity:.7;font-size:.85rem;max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .dBody{display:none;max-height:min(36vh,300px);overflow-y:auto;border-top:1px solid #374151;-webkit-overflow-scrolling:touch}
+  .drawer.open .dBody{display:block}
+  .dBody.tall{max-height:min(75vh,560px)}
+  .item{display:flex;align-items:center;gap:8px;padding:0 10px 0 0;border-bottom:1px solid #2b3545}
+  .item:last-child{border-bottom:0}
+  .item.active{background:rgba(34,197,94,.16)}
+  .iMain{flex:1;min-width:0;display:flex;align-items:center;gap:10px;padding:12px 4px 12px 14px;cursor:pointer}
+  .dot{width:11px;height:11px;border-radius:50%;border:2px solid #6b7280;flex:none}
+  .item.active .dot{background:#22c55e;border-color:#22c55e}
+  .iName{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .iCount{opacity:.55;font-size:.8rem;flex:none}
+  .iActs{display:flex;gap:6px;flex:none}
+  .mini{padding:6px 9px;min-width:36px;font-size:.95rem;border-radius:10px;background:#374151;color:#f9fafb;font-weight:600}
+  .mini.on{background:#22c55e;color:#052e16}
+  .mini.warn{background:#dc2626;color:#fff}
+  .empty{padding:12px 14px;opacity:.65;font-size:.9rem}
+  .more{padding:12px 14px;background:#18212f;border-bottom:1px solid #2b3545;display:flex;flex-direction:column;gap:10px}
+  .more .hint{font-size:.8rem;opacity:.65;margin:0}
+  .more .row button{padding:10px;font-size:.95rem}
   button{padding:16px;border:0;border-radius:14px;font-size:1.15rem;font-weight:700;background:#22c55e;color:#052e16;cursor:pointer}
   button.secondary{background:#374151;color:#f9fafb;font-weight:600;font-size:1rem;padding:12px}
   .big{font-size:min(16vw,26vh);font-weight:800;line-height:1.05;word-break:break-word;padding:0 4vw}
@@ -69,16 +93,7 @@
   <div class="card">
     <h1>Forehead Game</h1>
     <p class="sub">Phone on your forehead. Tilt <b>down</b> = got it, tilt <b>up</b> = pass.<br>You can also tap the <b>bottom</b> half of the screen = got it, <b>top</b> half = pass.</p>
-    <label>Built-in themes
-      <select id="deckB"></select>
-    </label>
-    <label>My themes (AI &amp; custom)
-      <select id="deckU"></select>
-    </label>
-    <div class="tools" id="themeTools">
-      <button class="secondary" id="exportBtn">⬇ Export</button>
-      <button class="secondary" id="deleteBtn">🗑 Delete</button>
-    </div>
+    <div id="drawers" class="drawers"></div>
     <p class="status" id="menuNote"></p>
     <label id="customWrap" style="display:none">Your words (comma or new line separated)
       <textarea id="custom" placeholder="pizza, Eiffel Tower, karaoke..."></textarea>
@@ -211,46 +226,145 @@
   const UK = "fg_user_themes";
   let USER = {};
   try { USER = JSON.parse(store.get(UK, "{}")) || {}; } catch(e){ USER = {}; }
+  let META = {};          // theme name -> the text it was generated from (used when asking for more)
+  try { META = JSON.parse(store.get("fg_user_meta", "{}")) || {}; } catch(e){ META = {}; }
   function saveUser(){
+    store.set("fg_user_meta", JSON.stringify(META));
     const ok = store.set(UK, JSON.stringify(USER));
     try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch(e){}
     return ok;
   }
 
-  /* ---------- Deck UI ---------- */
-  const deckB = $("#deckB"), deckU = $("#deckU");
+  /* ---------- Deck UI: two inline drawers (no popups) ---------- */
   const CUSTOM = "__custom__";
   let curDeck = "";              // the active theme: "b:<name>" (built-in), "u:<name>" (mine) or CUSTOM
+  let DRAW = null;               // which drawers are open: {b:bool, u:bool}
+  try { DRAW = JSON.parse(store.get("fg_drawers", "null")); } catch(e){}
+  // state of the per-theme "AI generate more" panel
+  let moreFor = "", moreCount = 100, moreBusy = false, moreMsg = { text: "", cls: "" }, undoInfo = null, confirmClear = "";
+
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const slug = n => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"") || "theme";
+  const note = (msg, cls="") => { const n = $("#menuNote"); n.textContent = msg; n.className = "status " + cls; };
+
   function rebuildDecks(want){
-    deckB.innerHTML = ""; deckU.innerHTML = "";
-    deckB.add(new Option("Pick a built-in theme…", ""));
-    Object.keys(DECKS).forEach(k => deckB.add(new Option(k + " (" + DECKS[k].length + ")", "b:" + k)));
-    deckU.add(new Option(Object.keys(USER).length ? "Pick one of my themes…" : "No AI themes yet", ""));
-    Object.keys(USER).forEach(k => deckU.add(new Option(k + " (" + USER[k].length + ")", "u:" + k)));
-    deckU.add(new Option("Type my own words…", CUSTOM));
-    const has = v => v && [...deckB.options, ...deckU.options].some(o => o.value === v);
+    const has = v => v === CUSTOM || (typeof v === "string" && ((v.startsWith("b:") && DECKS[v.slice(2)]) || (v.startsWith("u:") && USER[v.slice(2)])));
     let v = want || store.get("fg_deck");
     if (!has(v) && has("b:" + v)) v = "b:" + v;      // old saved value without prefix
     if (!has(v)) v = Object.keys(DECKS).length ? "b:" + Object.keys(DECKS)[0] : "";
     pickDeck(v);
   }
-  // Choosing in one dropdown makes it the active one and clears the other.
   function pickDeck(v){
     curDeck = v || "";
-    deckB.value = curDeck.startsWith("b:") ? curDeck : "";
-    deckU.value = (curDeck.startsWith("u:") || curDeck === CUSTOM) ? curDeck : "";
-    deckB.classList.toggle("on", !!deckB.value);
-    deckU.classList.toggle("on", !!deckU.value);
-    syncDeck();
+    syncDeck(); renderDrawers();
   }
-  function syncDeck(){
-    $("#customWrap").style.display = curDeck === CUSTOM ? "flex" : "none";
-    $("#themeTools").classList.toggle("on", curDeck.startsWith("u:"));
+  function syncDeck(){ $("#customWrap").style.display = curDeck === CUSTOM ? "flex" : "none"; }
+  function pickItem(v){ note(""); pickDeck(v); store.set("fg_deck", v); }
+
+  function renderDrawers(){
+    const host = $("#drawers"), keep = {};
+    host.querySelectorAll(".dBody").forEach(b => keep[b.dataset.d] = b.scrollTop);
+    host.textContent = "";
+    host.append(buildDrawer("b"), buildDrawer("u"));
+    host.querySelectorAll(".dBody").forEach(b => { if (keep[b.dataset.d]) b.scrollTop = keep[b.dataset.d]; });
   }
-  const onDeckChange = e => { $("#menuNote").textContent = ""; pickDeck(e.target.value); store.set("fg_deck", curDeck); };
-  deckB.onchange = deckU.onchange = onDeckChange;
+  function mini(txt, label, fn, cls){
+    const b = el("button", "mini" + (cls ? " " + cls : ""), txt);
+    b.setAttribute("aria-label", label); b.title = label;
+    b.onclick = e => { e.stopPropagation(); fn(); };
+    return b;
+  }
+  function itemRow(v, label, count, acts){
+    const row = el("div", "item" + (curDeck === v ? " active" : ""));
+    const main = el("div", "iMain");
+    main.append(el("span", "dot"), el("span", "iName", label));
+    if (count != null) main.append(el("span", "iCount", String(count)));
+    main.onclick = () => pickItem(v);
+    row.append(main); if (acts) row.append(acts);
+    return row;
+  }
+  function buildDrawer(id){
+    const isB = id === "b", open = !!(DRAW && DRAW[id]);
+    const box = el("div", "drawer" + (open ? " open" : ""));
+    const names = isB ? Object.keys(DECKS) : Object.keys(USER);
+    let sub = names.length + (isB ? " themes" : " saved");
+    if (isB && curDeck.startsWith("b:")) sub = curDeck.slice(2);
+    if (!isB && curDeck.startsWith("u:")) sub = curDeck.slice(2);
+    if (!isB && curDeck === CUSTOM) sub = "your own words";
+    const head = el("button", "dHead"); head.setAttribute("aria-expanded", String(open));
+    head.append(el("span", "chev", "▸"), el("span", "dTitle", isB ? "Built-in themes" : "My themes (AI & custom)"), el("span", "dSub", sub));
+    head.onclick = () => { DRAW = DRAW || {}; DRAW[id] = !DRAW[id]; store.set("fg_drawers", JSON.stringify(DRAW)); renderDrawers(); };
+    const body = el("div", "dBody" + (!isB && moreFor && USER[moreFor] ? " tall" : "")); body.dataset.d = id;
+    if (isB) names.forEach(n => body.append(itemRow("b:" + n, n, DECKS[n].length)));
+    else {
+      names.forEach(n => {
+        const acts = el("div", "iActs");
+        acts.append(
+          mini("⬇", "Export", () => exportTheme(n)),
+          mini("✨", "AI: generate more", () => { moreFor = moreFor === n ? "" : n; moreMsg = { text: "", cls: "" }; renderDrawers(); }, moreFor === n ? "on" : ""),
+          mini(confirmClear === n ? "Sure?" : "🗑", "Clear this theme", () => clearTheme(n), confirmClear === n ? "warn" : ""));
+        body.append(itemRow("u:" + n, n, USER[n].length, acts));
+        if (moreFor === n) body.append(morePanel(n));
+      });
+      if (!names.length) body.append(el("div", "empty", "No AI themes yet. Use ✨ Generate a theme below to make one."));
+      body.append(itemRow(CUSTOM, "✍ Type my own words…", null));
+    }
+    box.append(head, body);
+    return box;
+  }
+
+  function morePanel(n){
+    const p = el("div", "more");
+    p.append(el("p", "hint", "Sends your " + USER[n].length + " current entries to Gemini so it finds different ones."));
+    const lab = el("label", null, "How many new entries?");
+    const inp = el("input"); inp.type = "number"; inp.min = 10; inp.max = 500; inp.step = 10; inp.value = moreCount; inp.disabled = moreBusy;
+    inp.oninput = () => { moreCount = Math.max(10, Math.min(500, parseInt(inp.value, 10) || 100)); };
+    lab.append(inp); p.append(lab);
+    const row = el("div", "row");
+    const add = el("button", null, moreBusy ? "Working…" : "＋ Add to list"); add.disabled = moreBusy; add.onclick = () => generateMore(n, "add");
+    const rep = el("button", "secondary", "↻ Replace list"); rep.disabled = moreBusy; rep.onclick = () => generateMore(n, "replace");
+    row.append(add, rep); p.append(row);
+    p.append(el("p", "hint", "Replace deletes the old entries once the new ones have arrived."));
+    const st = el("p", "status" + (moreMsg.cls ? " " + moreMsg.cls : ""), moreMsg.text); st.id = "moreStatus"; p.append(st);
+    if (moreMsg.needKey) { const b = el("button", "secondary", "Open ✨ Generate to add your key"); b.onclick = () => { phase = "gen"; show("gen"); }; p.append(b); }
+    if (undoInfo && undoInfo.name === n && !moreBusy) {
+      const u = el("button", "secondary", "↩ Undo last change (back to " + undoInfo.list.length + " entries)");
+      u.onclick = () => { USER[n] = undoInfo.list; undoInfo = null; saveUser(); moreMsg = { text: "Restored.", cls: "ok" }; renderDrawers(); };
+      p.append(u);
+    }
+    return p;
+  }
+  const setMore = (text, cls="") => {
+    moreMsg = { text, cls };
+    const e = $("#moreStatus"); if (e) { e.textContent = text; e.className = "status " + cls; }
+  };
+
+  function exportTheme(name){
+    const list = USER[name]; if (!list) return;
+    const txt = "// Exported from Forehead Game. Put this file in lists/ and add a <script src> tag for it in index.html.\n" +
+      "(window.LISTS = window.LISTS || {})[" + JSON.stringify(name) + "] = `\n" + list.join("\n") + "\n`;\n";
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([txt], { type: "text/javascript" }));
+    a.download = slug(name) + ".js";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    note("Exported " + a.download, "ok");
+  }
+  function clearTheme(n){            // two taps instead of a confirm popup
+    if (confirmClear !== n) {
+      confirmClear = n; renderDrawers();
+      setTimeout(() => { if (confirmClear === n) { confirmClear = ""; renderDrawers(); } }, 2500);
+      return;
+    }
+    confirmClear = ""; delete USER[n]; delete META[n]; saveUser();
+    if (moreFor === n) moreFor = "";
+    if (curDeck === "u:" + n) rebuildDecks(); else renderDrawers();
+    note('Cleared "' + n + '".');
+  }
+
   $("#custom").value = store.get("fg_custom", "");
   rebuildDecks();
+  if (!DRAW) { DRAW = { b: !curDeck || curDeck.startsWith("b:"), u: curDeck.startsWith("u:") || curDeck === CUSTOM }; renderDrawers(); }
 
   $("#tiltDeg").value = store.get("fg_tilt", "40");
   $("#tiltVal").textContent = $("#tiltDeg").value + "°";
@@ -264,24 +378,6 @@
   $("#touchOn").checked = store.get("fg_touch", "1") !== "0";
   $("#touchOn").onchange = e => store.set("fg_touch", e.target.checked ? "1" : "0");
 
-  const slug = n => n.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"") || "theme";
-  $("#exportBtn").onclick = () => {
-    const name = curDeck.slice(2), list = USER[name]; if (!list) return;
-    const txt = "// Exported from Forehead Game. Put this file in lists/ and add a <script src> tag for it in index.html.\n" +
-      "(window.LISTS = window.LISTS || {})[" + JSON.stringify(name) + "] = `\n" + list.join("\n") + "\n`;\n";
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([txt], { type: "text/javascript" }));
-    a.download = slug(name) + ".js";
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-    $("#menuNote").className = "status ok"; $("#menuNote").textContent = "Exported " + a.download;
-  };
-  $("#deleteBtn").onclick = () => {
-    const name = curDeck.slice(2);
-    if (!USER[name] || !confirm('Delete your theme "' + name + '"?')) return;
-    delete USER[name]; saveUser(); rebuildDecks();
-    $("#menuNote").className = "status"; $("#menuNote").textContent = 'Deleted "' + name + '".';
-  };
 
   /* ---------- Sensor ---------- */
   // Tilt of the screen from vertical, in degrees (0 = upright on the forehead, +/-90 = facing floor/ceiling).
@@ -443,8 +539,8 @@
   async function startInner(my){
     const nap = async ms => { await sleep(ms); if (my !== run) throw CANCEL; };
     words = getWords();
-    if (!curDeck) { alert("Pick a theme first."); return; }
-    if (words.length < 3) { alert("Need at least 3 words in the deck."); return; }
+    if (!curDeck) { note("Pick a theme first.", "err"); return; }
+    if (words.length < 3) { note("Need at least 3 entries in the theme.", "err"); return; }
     store.set("fg_deck", curDeck);
 
     // Must be called directly from the tap (iOS permission + fullscreen)
@@ -604,12 +700,15 @@
   const gstat = (msg, cls="") => { const e = $("#genStatus"); e.textContent = msg; e.className = "status " + cls; };
 
   // The prompt: this is what decides the quality of the lists.
-  function buildPrompt(theme, total){
+  function buildPrompt(theme, total, avoid){
+    const task = avoid && avoid.length
+      ? `ALREADY IN THE LIST (${avoid.length} entries). Do NOT repeat any of them, nor near-duplicates or other spellings of them. Find DIFFERENT items that fit the same theme, in the same style and difficulty mix:\n${avoid.slice(0, 1000).join("\n")}\n\nWrite ${total} different NEW entries that belong to this theme.`
+      : `Write ${total} different entries that belong to this theme.`;
     return `You are writing the word list for a party guessing game (like Heads Up! or charades). One player holds a phone on their forehead; their friends give spoken clues or act things out until that player guesses the word on the screen.
 
 THEME: ${JSON.stringify(theme)}
 
-Write ${total} different entries that belong to this theme.
+${task}
 
 Requirements:
 1. Guessable: every entry must be something most players would recognise and be able to describe or act out. Prefer well-known, specific things over obscure ones. If the theme is niche, stick to the best-known items of that niche.
@@ -707,23 +806,20 @@ Return JSON only, in the form {"entries": ["...", "..."]}.`;
     return (e.message || String(e)) + tech;
   }
 
-  let genRun = 0;
+  const keyOf = e => norm(e) || e.toLowerCase();
   const TMO = 45000;       // per attempt: a model that is this slow gets skipped for the next one
-  $("#genBtn").onclick = async () => {
-    const my = ++genRun;
-    const key = $("#apiKey").value.trim();
-    const theme = $("#genTheme").value.replace(/\s+/g, " ").trim();
-    const want = Math.max(10, Math.min(500, parseInt($("#genCount").value, 10) || 150));
-    $("#genOut").classList.remove("on");
-    if (!key) return gstat("Paste your Gemini API key first.", "err");
-    if (!theme) return gstat("Type a theme first.", "err");
-    store.set("fg_gemini_key", key);
-    const btn = $("#genBtn"); btn.disabled = true; btn.textContent = "Generating…";
-    // Live status line with an elapsed-seconds counter
+
+  // Live status with an elapsed-seconds counter
+  function progress(setter){
     const t0 = Date.now(); let msg = "Starting…";
-    const paint = () => gstat(msg + " (" + Math.round((Date.now() - t0) / 1000) + "s)");
-    const prog = m => { msg = m; paint(); };
+    const paint = () => setter(msg + " (" + Math.round((Date.now() - t0) / 1000) + "s)");
     const tick = setInterval(paint, 1000);
+    return { prog: m => { msg = m; paint(); }, stop: () => clearInterval(tick), secs: () => Math.round((Date.now() - t0) / 1000) };
+  }
+
+  // Sends a prompt to Gemini: picks models, adapts the request format, skips slow models, retries.
+  // Returns { text, model }.
+  async function askGemini(key, prompt, prog){
     // No AbortSignal on purpose: Firefox can't pass it through the service worker ("could not be cloned")
     let timer;
     const withTimeout = p => Promise.race([p, new Promise((_, rej) => {
@@ -735,18 +831,16 @@ Return JSON only, in the form {"entries": ["...", "..."]}.`;
       try { const l = await pickModels(key); store.set("fg_models_auto", JSON.stringify(l)); return l; }
       catch(e){ if (e.status) throw e; return ["gemini-2.5-flash-lite", "gemini-2.5-flash"]; }
     };
-    let model = "";
     try {
       let models;
       if (manual) models = [manual];
       else { try { models = JSON.parse(store.get("fg_models_auto", "null")); } catch(e){} if (!Array.isArray(models) || !models.length) models = await loadModels(); }
-      const total = want + Math.ceil(want * 0.15);          // ask for extra, duplicates get removed then we trim
-      let text, tries = 0, redetected = false, mi = 0;
+      let tries = 0, redetected = false, mi = 0;
       let ti = Math.min(THINK.length - 1, parseInt(store.get("fg_think", "0"), 10) || 0);
       for (;;) {
-        model = models[mi];
-        prog("Asking " + model + " for " + want + " entries…");
-        try { text = await withTimeout(callGemini(key, model, buildPrompt(theme, total), THINK[ti])); clearTimeout(timer); store.set("fg_think", String(ti)); break; }
+        const model = models[mi];
+        prog("Asking " + model + "…");
+        try { const text = await withTimeout(callGemini(key, model, prompt, THINK[ti])); clearTimeout(timer); store.set("fg_think", String(ti)); return { text, model }; }
         catch(e){
           clearTimeout(timer);
           if (e.status === 400 && !/api key/i.test(e.message) && ti < THINK.length - 1) { ti++; prog("Trying a different request format…"); continue; }
@@ -758,21 +852,70 @@ Return JSON only, in the form {"entries": ["...", "..."]}.`;
           throw e;
         }
       }
+    } finally { clearTimeout(timer); }
+  }
+
+  /* ----- Generate screen ----- */
+  let genRun = 0, lastGenTheme = "";
+  $("#genBtn").onclick = async () => {
+    const my = ++genRun;
+    const key = $("#apiKey").value.trim();
+    const theme = $("#genTheme").value.replace(/\s+/g, " ").trim();
+    const want = Math.max(10, Math.min(500, parseInt($("#genCount").value, 10) || 150));
+    $("#genOut").classList.remove("on");
+    if (!key) return gstat("Paste your Gemini API key first.", "err");
+    if (!theme) return gstat("Type a theme first.", "err");
+    store.set("fg_gemini_key", key);
+    const btn = $("#genBtn"); btn.disabled = true; btn.textContent = "Generating…";
+    const pg = progress(m => gstat(m));
+    try {
+      const total = want + Math.ceil(want * 0.15);          // ask for extra, duplicates get removed then we trim
+      const { text, model } = await askGemini(key, buildPrompt(theme, total), m => pg.prog(m.replace(/…$/, "") + " for " + want + " entries…"));
       if (my !== genRun) return;
       const entries = parseEntries(text).slice(0, want);
       if (entries.length < 3) throw new Error("Gemini did not return a usable list. Try again or reword the theme.");
+      lastGenTheme = theme;
       $("#genName").value = theme.length > 40 ? theme.slice(0, 40).trim() : theme;
       $("#genList").value = entries.join("\n");
       updateGenCount();
       $("#genOut").classList.add("on");
-      gstat("Done in " + Math.round((Date.now() - t0) / 1000) + "s with " + model + ". Review the list below, remove anything you don't like, then save.", "ok");
+      gstat("Done in " + pg.secs() + "s with " + model + ". Review the list below, remove anything you don't like, then save.", "ok");
       $("#genOut").scrollIntoView({ behavior: "smooth", block: "start" });
     } catch(e){
       if (my === genRun) gstat(friendly(e), "err");
     } finally {
-      clearTimeout(timer); clearInterval(tick); btn.disabled = false; btn.textContent = "Generate";
+      pg.stop(); btn.disabled = false; btn.textContent = "Generate";
     }
   };
+
+  /* ----- "AI generate more" for a saved theme: sends the current list so the model avoids it ----- */
+  async function generateMore(name, mode){
+    if (moreBusy || !USER[name]) return;
+    const key = ($("#apiKey").value || store.get("fg_gemini_key", "")).trim();
+    if (!key) { moreMsg = { text: "Add your Gemini API key first (on the ✨ Generate screen).", cls: "err", needKey: true }; renderDrawers(); return; }
+    const old = USER[name].slice(), want = Math.max(10, Math.min(500, moreCount || 100));
+    moreBusy = true; undoInfo = null; setMore("Starting…"); renderDrawers();
+    const pg = progress(m => setMore(m));
+    try {
+      const total = want + Math.ceil(want * 0.3);          // extra, because some will be repeats
+      const { text, model } = await askGemini(key, buildPrompt(META[name] || name, total, old), m => pg.prog(m.replace(/…$/, "") + " for " + want + " new entries…"));
+      const seen = new Set(old.map(keyOf));
+      const parsed = parseEntries(text);
+      const fresh = parsed.filter(e => !seen.has(keyOf(e))).slice(0, want);
+      const repeats = parsed.length - parsed.filter(e => !seen.has(keyOf(e))).length;
+      if (mode === "replace") { if (fresh.length < 10) throw new Error("Gemini returned only " + fresh.length + " new entries, so your list was kept. Try again."); }
+      else if (!fresh.length) throw new Error("Gemini only returned entries you already have. Try again or ask for more.");
+      undoInfo = { name, list: old };
+      USER[name] = mode === "replace" ? fresh : old.concat(fresh);
+      saveUser();
+      moreMsg = { text: (mode === "replace" ? "Replaced the list with " + fresh.length + " new entries" : "Added " + fresh.length + " new entries (now " + USER[name].length + ")") +
+        " in " + pg.secs() + "s with " + model + (repeats ? ". " + repeats + (repeats === 1 ? " repeat" : " repeats") + " skipped" : "") + ".", cls: "ok" };
+    } catch(e){
+      moreMsg = { text: friendly(e), cls: "err" };
+    } finally {
+      pg.stop(); moreBusy = false; renderDrawers();
+    }
+  }
 
   const listFromBox = () => cleanEntries($("#genList").value.split(/\r?\n/));
   const updateGenCount = () => { $("#genCountLbl").textContent = "Entries (" + listFromBox().length + ")"; };
@@ -784,7 +927,7 @@ Return JSON only, in the form {"entries": ["...", "..."]}.`;
     if (!name) return gstat("Give the theme a name.", "err");
     if (list.length < 3) return gstat("A theme needs at least 3 entries.", "err");
     const base = name; for (let i = 2; USER[name]; i++) name = base + " " + i;      // never overwrite an older theme
-    USER[name] = list;
+    USER[name] = list; META[name] = lastGenTheme || name;
     const ok = saveUser();
     rebuildDecks("u:" + name); store.set("fg_deck", "u:" + name);
     $("#genOut").classList.remove("on"); gstat(""); phase = "menu"; show("menu");
