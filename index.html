@@ -52,6 +52,11 @@
   .item:last-child{border-bottom:0}
   .item.active{background:rgba(34,197,94,.16)}
   .iMain{flex:1;min-width:0;display:flex;align-items:center;gap:10px;padding:12px 4px 12px 14px;cursor:pointer}
+  .themeThumb{width:48px;height:38px;object-fit:cover;border-radius:6px;flex:none;border:1px solid var(--line);filter:saturate(.78) sepia(.08)}
+  .imageCredits{padding:10px 14px 12px;border-top:1px solid var(--line-soft);font-size:.76rem;color:var(--muted);text-align:left}
+  .imageCredits summary{cursor:pointer;margin:0;opacity:.8}
+  .imageCredits ul{margin:8px 0 0;padding-left:18px;display:grid;gap:4px}
+  .imageCredits a{color:var(--terracotta-dark)}
   .dot{width:11px;height:11px;border-radius:50%;border:2px solid #6b7280;flex:none}
   .item.active .dot{background:#22c55e;border-color:#22c55e}
   .iName{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -150,7 +155,57 @@
   input[type=checkbox],input[type=range]{accent-color:var(--sage)}
   ::selection{background:#e7d4c8;color:var(--ink)}
 
-</style>
+  /* ---------- Drawer open/close animation ---------- */
+  .dBody{
+    display:block;
+    max-height:0;
+    overflow:hidden;
+    opacity:0;
+    border-top:1px solid transparent;
+    transition:max-height .28s cubic-bezier(.4,0,.2,1),
+               opacity .22s ease,
+               border-top-color .2s ease;
+  }
+  .drawer.open .dBody{
+    max-height:min(36vh,300px);
+    opacity:1;
+    border-top-color:var(--line);
+  }
+  .drawer.open .dBody.tall{max-height:min(75vh,560px);}
+  /* keep inner scrollability only when fully open */
+  .dBody{overflow-y:hidden}
+  .drawer.open .dBody{overflow-y:auto}
+  @media (prefers-reduced-motion: reduce){
+    .dBody{transition:none}
+  }
+
+  /* ---------- Settings cogwheel button (bottom right) ---------- */
+  #settingsBtn{
+    position:fixed;
+    right:max(16px, env(safe-area-inset-right));
+    bottom:max(16px, env(safe-area-inset-bottom));
+    width:52px;height:52px;
+    padding:0;
+    border-radius:50%;
+    background:var(--surface-alt);
+    border:1px solid var(--line);
+    display:flex;align-items:center;justify-content:center;
+    z-index:20;
+    box-shadow:0 2px 8px rgba(48,51,46,.12);
+    transition:background .15s ease, transform .12s ease;
+  }
+  #settingsBtn:hover{background:#e5ded1}
+  #settingsBtn:active{transform:translateY(1px)}
+  #settingsBtn svg{
+  width:26px;
+  height:26px;
+  display:block;
+  pointer-events:none;
+  transition:transform .4s ease;
+  }
+  #settingsBtn:hover svg{ transform:rotate(45deg); }
+  #startBtn{ font-size:2rem; padding:20px; }</style>
+  
 </head>
 <body>
 <canvas id="ambient" aria-hidden="true"></canvas>
@@ -159,17 +214,12 @@
 <section id="menu" class="screen scroll active">
   <div class="card">
     <h1>Forehead Game</h1>
-    <p class="sub">Phone on your forehead. Tilt <b>down</b> = got it, tilt <b>up</b> = pass.<br>You can also tap the <b>bottom</b> half of the screen = got it, <b>top</b> half = pass.</p>
     <div id="drawers" class="drawers"></div>
     <p class="status" id="menuNote"></p>
     <label id="customWrap" style="display:none">Your words (comma or new line separated)
       <textarea id="custom" placeholder="pizza, Eiffel Tower, karaoke..."></textarea>
     </label>
-    <button id="startBtn">Start</button>
-    <div class="row">
-      <button class="secondary" id="genOpenBtn">Generate a theme</button>
-      <button class="secondary" id="settingsBtn">Settings</button>
-    </div>
+    <button id="startBtn">Play !</button>
   </div>
 </section>
 
@@ -259,6 +309,27 @@
   </div>
 </section>
 
+<!-- Settings cogwheel button (bottom right) -->
+<button id="settingsBtn" aria-label="Settings">
+  <svg viewBox="0 0 24 24" fill="none" stroke="#30332e" stroke-width="1.8"
+       stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="3"></circle>
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83
+             2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33
+             1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09
+             A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06
+             a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82
+             1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09
+             A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06
+             a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33
+             H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09
+             a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06
+             a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9
+             a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09
+             a1.65 1.65 0 0 0-1.51 1z"></path>
+  </svg>
+</button>
+
 <!-- WORD LISTS: one file per list in lists/. To add one, create lists/<name>.js
      (copy an existing file) and add a matching <script> tag below. -->
 <script src="lists/celebrities.js"></script>
@@ -278,6 +349,7 @@
   const DECKS = {};
   for (const [name, txt] of Object.entries(LISTS))
     DECKS[name] = txt.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+
 
   const $ = s => document.querySelector(s);
   const screens = ["menu","settings","gen","prep","game","results"];
@@ -359,7 +431,7 @@
     if (!isB && curDeck.startsWith("u:")) sub = curDeck.slice(2);
     if (!isB && curDeck === CUSTOM) sub = "your own words";
     const head = el("button", "dHead"); head.setAttribute("aria-expanded", String(open));
-    head.append(el("span", "chev", "›"), el("span", "dTitle", isB ? "Built-in themes" : "My themes (AI & custom)"), el("span", "dSub", sub));
+    head.append(el("span", "chev", "›"), el("span", "dTitle", isB ? "Built-in themes" : "Custom themes"), el("span", "dSub", sub));
     head.onclick = () => {
       DRAW = DRAW || {};
       const willOpen = !DRAW[id];
@@ -369,8 +441,9 @@
       renderDrawers();
     };
     const body = el("div", "dBody" + (!isB && moreFor && USER[moreFor] ? " tall" : "")); body.dataset.d = id;
-    if (isB) names.forEach(n => body.append(itemRow("b:" + n, n, DECKS[n].length)));
-    else {
+    if (isB) {
+      names.forEach(n => body.append(itemRow("b:" + n, n, DECKS[n].length)));
+    } else {
       names.forEach(n => {
         const acts = el("div", "iActs");
         acts.append(
@@ -382,6 +455,12 @@
       });
       if (!names.length) body.append(el("div", "empty", "No AI themes yet. Use Generate a theme below to make one."));
       body.append(itemRow(CUSTOM, "Type my own words…" , null));
+      // Generate button integrated into the Custom drawer
+      const genRow = el("div", "more");
+      const genBtn = el("button", null, "Generate a theme with AI");
+      genBtn.onclick = () => { phase = "gen"; show("gen"); };
+      genRow.append(genBtn);
+      body.append(genRow);
     }
     box.append(head, body);
     return box;
@@ -775,7 +854,7 @@
   $("#genModel").value = store.get("fg_model", "");
   $("#apiKey").onchange = () => store.set("fg_gemini_key", $("#apiKey").value.trim());
   $("#genModel").onchange = () => { store.set("fg_model", $("#genModel").value.trim()); store.del("fg_models_auto"); };
-  $("#genOpenBtn").onclick = () => { phase = "gen"; show("gen"); };
+  // The old standalone Generate button has been removed; it's now inside the Custom drawer.
 
   const gstat = (msg, cls="") => { const e = $("#genStatus"); e.textContent = msg; e.className = "status " + cls; };
 
