@@ -1,0 +1,973 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<title>Forehead Game</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Forehead">
+
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+  html,body{margin:0;height:100%;background:#111827;color:#f9fafb;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;overflow:hidden}
+  .screen{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;padding:max(16px,env(safe-area-inset-top)) 20px max(16px,env(safe-area-inset-bottom));text-align:center;overflow-y:auto}
+  .screen.active{display:flex}
+  h1{margin:0 0 4px;font-size:2rem}
+  p.sub{margin:0 0 20px;opacity:.7}
+  .card{width:100%;max-width:420px;display:flex;flex-direction:column;gap:12px}
+  label{display:flex;flex-direction:column;gap:6px;text-align:left;font-size:.9rem;opacity:.9}
+  select,textarea,input[type=number]{width:100%;padding:12px;border-radius:12px;border:1px solid #374151;background:#1f2937;color:#fff;font-size:1rem}
+  input[type=text],input[type=password]{width:100%;padding:12px;border-radius:12px;border:1px solid #374151;background:#1f2937;color:#fff;font-size:1rem}
+  input,textarea{user-select:text;-webkit-user-select:text}
+  textarea{min-height:90px;resize:vertical}
+  a{color:#86efac}
+  .screen.scroll{justify-content:flex-start}
+  .screen.scroll>.card{margin:auto}
+  .backBtn.inline{position:static;align-self:flex-start}
+  .tools{display:none;gap:8px}.tools.on{display:flex}.tools>button{flex:1;padding:8px;font-size:.9rem}
+  .chk{flex-direction:row;align-items:center;gap:10px;font-size:.9rem}
+  .chk input{width:auto}
+  .status{min-height:1.2em;font-size:.95rem;text-align:left;opacity:.9;white-space:pre-wrap}
+  .status.err{color:#fca5a5}.status.ok{color:#86efac}
+  details{text-align:left;font-size:.9rem}
+  summary{cursor:pointer;opacity:.8;margin-bottom:8px}
+  #genOut{display:none;flex-direction:column;gap:10px}#genOut.on{display:flex}
+  #genList{min-height:200px;font-size:.9rem}
+  button:disabled{opacity:.5;cursor:default}
+  .drawers{display:flex;flex-direction:column;gap:10px}
+  .drawer{border:1px solid #374151;border-radius:14px;background:#1f2937;overflow:hidden;text-align:left}
+  .dHead{width:100%;display:flex;align-items:center;gap:10px;padding:14px;background:transparent;color:#f9fafb;font-size:1rem;font-weight:700;border-radius:0;text-align:left}
+  .dHead .chev{transition:transform .15s;opacity:.8}
+  .drawer.open .chev{transform:rotate(90deg)}
+  .dSub{margin-left:auto;font-weight:500;opacity:.7;font-size:.85rem;max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .dBody{display:none;max-height:min(36vh,300px);overflow-y:auto;border-top:1px solid #374151;-webkit-overflow-scrolling:touch}
+  .drawer.open .dBody{display:block}
+  .dBody.tall{max-height:min(75vh,560px)}
+  .item{display:flex;align-items:center;gap:8px;padding:0 10px 0 0;border-bottom:1px solid #2b3545}
+  .item:last-child{border-bottom:0}
+  .item.active{background:rgba(34,197,94,.16)}
+  .iMain{flex:1;min-width:0;display:flex;align-items:center;gap:10px;padding:12px 4px 12px 14px;cursor:pointer}
+  .dot{width:11px;height:11px;border-radius:50%;border:2px solid #6b7280;flex:none}
+  .item.active .dot{background:#22c55e;border-color:#22c55e}
+  .iName{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .iCount{opacity:.55;font-size:.8rem;flex:none}
+  .iActs{display:flex;gap:6px;flex:none}
+  .mini{padding:6px 9px;min-width:36px;font-size:.95rem;border-radius:10px;background:#374151;color:#f9fafb;font-weight:600}
+  .mini.on{background:#22c55e;color:#052e16}
+  .mini.warn{background:#dc2626;color:#fff}
+  .empty{padding:12px 14px;opacity:.65;font-size:.9rem}
+  .more{padding:12px 14px;background:#18212f;border-bottom:1px solid #2b3545;display:flex;flex-direction:column;gap:10px}
+  .more .hint{font-size:.8rem;opacity:.65;margin:0}
+  .more .row button{padding:10px;font-size:.95rem}
+  button{padding:16px;border:0;border-radius:14px;font-size:1.15rem;font-weight:700;background:#22c55e;color:#052e16;cursor:pointer}
+  button.secondary{background:#374151;color:#f9fafb;font-weight:600;font-size:1rem;padding:12px}
+  .big{font-size:min(16vw,26vh);font-weight:800;line-height:1.05;word-break:break-word;padding:0 4vw}
+  .msg{font-size:min(8vw,12vh);font-weight:800;line-height:1.15}
+  .small{opacity:.7;font-size:1rem;margin-top:12px}
+  #game{transition:background .08s}
+  #game.ok{background:#16a34a}
+  #game.pass{background:#dc2626}
+  #hud{position:absolute;top:max(10px,env(safe-area-inset-top));left:0;right:0;display:flex;justify-content:space-between;padding:0 20px;font-size:1.4rem;font-weight:700;opacity:.85;pointer-events:none}
+  #hud span:first-child{margin-left:96px}
+  .backBtn{position:absolute;top:max(10px,env(safe-area-inset-top));left:12px;z-index:5;padding:8px 14px;font-size:.95rem;font-weight:600;border-radius:10px;background:rgba(55,65,81,.85);color:#f9fafb}
+  .finishBtn{position:absolute;right:12px;bottom:max(12px,env(safe-area-inset-bottom));z-index:5;padding:8px 14px;font-size:.95rem;font-weight:600;border-radius:10px;background:rgba(55,65,81,.85)}
+  #rotate{display:none;position:absolute;bottom:14px;font-size:.9rem;opacity:.7}
+  @media (orientation:portrait){#rotate{display:block}}
+  ul.res{list-style:none;padding:0;margin:0;text-align:left;max-height:34vh;overflow-y:auto;width:100%}
+  ul.res li{padding:6px 10px;border-radius:8px;margin-bottom:4px;background:#1f2937}
+  ul.res li.c{border-left:5px solid #22c55e}
+  ul.res li.p{border-left:5px solid #ef4444;opacity:.8}
+  .score{font-size:4rem;font-weight:800;margin:0}
+  .row{display:flex;gap:12px}.row>*{flex:1}
+</style>
+</head>
+<body>
+
+<!-- MENU -->
+<section id="menu" class="screen scroll active">
+  <div class="card">
+    <h1>Forehead Game</h1>
+    <p class="sub">Phone on your forehead. Tilt <b>down</b> = got it, tilt <b>up</b> = pass.<br>You can also tap the <b>bottom</b> half of the screen = got it, <b>top</b> half = pass.</p>
+    <div id="drawers" class="drawers"></div>
+    <p class="status" id="menuNote"></p>
+    <label id="customWrap" style="display:none">Your words (comma or new line separated)
+      <textarea id="custom" placeholder="pizza, Eiffel Tower, karaoke..."></textarea>
+    </label>
+    <button id="startBtn">Start</button>
+    <div class="row">
+      <button class="secondary" id="genOpenBtn">✨ Generate a theme</button>
+      <button class="secondary" id="settingsBtn">⚙ Settings</button>
+    </div>
+  </div>
+</section>
+
+<!-- SETTINGS -->
+<section id="settings" class="screen scroll">
+  <div class="card">
+    <button class="secondary backBtn inline" aria-label="Back">← Back</button>
+    <h1 style="font-size:1.5rem">⚙ Settings</h1>
+    <label>Round length (seconds)
+      <input type="number" id="secs" value="60" min="5" step="5" inputmode="numeric">
+    </label>
+    <label class="chk"><input type="checkbox" id="unlimited"> No time limit (you end the round yourself)</label>
+    <label>Tilt needed to answer: <b id="tiltVal">40°</b>
+      <input type="range" id="tiltDeg" min="25" max="65" step="5" value="40">
+      <span class="small" style="margin:0;font-size:.8rem">Lower = more sensitive. Raise it if it answers by accident.</span>
+    </label>
+    <label class="chk"><input type="checkbox" id="touchOn" checked> Tap the screen to answer (bottom = correct, top = pass)</label>
+    <button class="secondary" id="recalBtn">Recalibrate tilt direction next game</button>
+    <p class="small" id="sensorNote"></p>
+  </div>
+</section>
+
+<!-- AI THEME GENERATOR -->
+<section id="gen" class="screen scroll">
+  <div class="card">
+    <button class="secondary backBtn inline" aria-label="Back">← Back</button>
+    <h1 style="font-size:1.5rem">✨ Generate a theme</h1>
+    <label>Gemini API key
+      <input type="password" id="apiKey" placeholder="AIza..." autocomplete="off" autocapitalize="off" spellcheck="false">
+    </label>
+    <p class="status" style="opacity:.7;margin:0">Free key from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>. It is saved only in this browser and sent only to Google.</p>
+    <label>Theme (a word or a phrase)
+      <input type="text" id="genTheme" placeholder="e.g. 90s cartoons, French rappers, things in a kitchen" maxlength="200" autocomplete="off">
+    </label>
+    <label>Number of entries
+      <input type="number" id="genCount" value="150" min="10" max="500" step="10">
+    </label>
+    <details>
+      <summary>Advanced</summary>
+      <label>Model (leave empty to pick one automatically)
+        <input type="text" id="genModel" placeholder="auto" autocapitalize="off" spellcheck="false">
+      </label>
+    </details>
+    <button id="genBtn">Generate</button>
+    <p class="status" id="genStatus"></p>
+    <div id="genOut">
+      <label>Theme name
+        <input type="text" id="genName" maxlength="40" autocomplete="off">
+      </label>
+      <label><span id="genCountLbl">Entries</span> (one per line, edit freely)
+        <textarea id="genList"></textarea>
+      </label>
+      <div class="row">
+        <button id="genSaveBtn">Save theme</button>
+        <button class="secondary" id="genDiscardBtn">Discard</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PREP / CALIBRATION -->
+<section id="prep" class="screen">
+  <button class="backBtn" aria-label="Back">← Back</button>
+  <div class="msg" id="prepMsg"></div>
+  <div class="small" id="prepSub"></div>
+</section>
+
+<!-- GAME -->
+<section id="game" class="screen">
+  <button class="backBtn" aria-label="Back">← Back</button>
+  <button class="secondary finishBtn" id="finishBtn" style="display:none">Finish round</button>
+  <div id="hud"><span id="timer">60</span><span id="score">0</span></div>
+  <div class="big" id="word"></div>
+  <div id="rotate">↻ Rotate your phone to landscape</div>
+</section>
+
+<!-- RESULTS -->
+<section id="results" class="screen scroll">
+  <div class="card">
+    <p class="sub">Time's up!</p>
+    <p class="score" id="finalScore">0</p>
+    <ul class="res" id="resList"></ul>
+    <div class="row">
+      <button id="againBtn">Play again</button>
+      <button class="secondary" id="menuBtn">Menu</button>
+    </div>
+  </div>
+</section>
+
+<!-- WORD LISTS: one file per list in lists/. To add one, create lists/<name>.js
+     (copy an existing file) and add a matching <script> tag below. -->
+<script src="lists/celebrities.js"></script>
+<script src="lists/movies.js"></script>
+<script src="lists/french-culture.js"></script>
+<script src="lists/minecraft.js"></script>
+<script src="lists/tv-series.js"></script>
+<script src="lists/computer-science.js"></script>
+<script src="lists/semiconductors.js"></script>
+<script src="lists/video-games.js"></script>
+
+<script>
+(() => {
+  /* ---------- Word lists come from lists/*.js (see <script> tags above) ---------- */
+  const LISTS = window.LISTS || {};
+
+  const DECKS = {};
+  for (const [name, txt] of Object.entries(LISTS))
+    DECKS[name] = txt.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+
+  const $ = s => document.querySelector(s);
+  const screens = ["menu","settings","gen","prep","game","results"];
+  const show = id => screens.forEach(s => $("#"+s).classList.toggle("active", s===id));
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const store = {
+    get(k, d=null){ try { const v = localStorage.getItem(k); return v === null ? d : v; } catch(e){ return d; } },
+    set(k, v){ try { localStorage.setItem(k, v); return true; } catch(e){ return false; } },
+    del(k){ try { localStorage.removeItem(k); } catch(e){} }
+  };
+
+  /* ---------- User themes (saved in this browser) ---------- */
+  const UK = "fg_user_themes";
+  let USER = {};
+  try { USER = JSON.parse(store.get(UK, "{}")) || {}; } catch(e){ USER = {}; }
+  let META = {};          // theme name -> the text it was generated from (used when asking for more)
+  try { META = JSON.parse(store.get("fg_user_meta", "{}")) || {}; } catch(e){ META = {}; }
+  function saveUser(){
+    store.set("fg_user_meta", JSON.stringify(META));
+    const ok = store.set(UK, JSON.stringify(USER));
+    try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch(e){}
+    return ok;
+  }
+
+  /* ---------- Deck UI: two inline drawers (no popups) ---------- */
+  const CUSTOM = "__custom__";
+  let curDeck = "";              // the active theme: "b:<name>" (built-in), "u:<name>" (mine) or CUSTOM
+  let DRAW = null;               // which drawers are open: {b:bool, u:bool}
+  try { DRAW = JSON.parse(store.get("fg_drawers", "null")); } catch(e){}
+  // state of the per-theme "AI generate more" panel
+  let moreFor = "", moreCount = 100, moreBusy = false, moreMsg = { text: "", cls: "" }, undoInfo = null, confirmClear = "";
+
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const slug = n => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"") || "theme";
+  const note = (msg, cls="") => { const n = $("#menuNote"); n.textContent = msg; n.className = "status " + cls; };
+
+  function rebuildDecks(want){
+    const has = v => v === CUSTOM || (typeof v === "string" && ((v.startsWith("b:") && DECKS[v.slice(2)]) || (v.startsWith("u:") && USER[v.slice(2)])));
+    let v = want || store.get("fg_deck");
+    if (!has(v) && has("b:" + v)) v = "b:" + v;      // old saved value without prefix
+    if (!has(v)) v = Object.keys(DECKS).length ? "b:" + Object.keys(DECKS)[0] : "";
+    pickDeck(v);
+  }
+  function pickDeck(v){
+    curDeck = v || "";
+    syncDeck(); renderDrawers();
+  }
+  function syncDeck(){ $("#customWrap").style.display = curDeck === CUSTOM ? "flex" : "none"; }
+  function pickItem(v){ note(""); pickDeck(v); store.set("fg_deck", v); }
+
+  function renderDrawers(){
+    const host = $("#drawers"), keep = {};
+    host.querySelectorAll(".dBody").forEach(b => keep[b.dataset.d] = b.scrollTop);
+    host.textContent = "";
+    host.append(buildDrawer("b"), buildDrawer("u"));
+    host.querySelectorAll(".dBody").forEach(b => { if (keep[b.dataset.d]) b.scrollTop = keep[b.dataset.d]; });
+  }
+  function mini(txt, label, fn, cls){
+    const b = el("button", "mini" + (cls ? " " + cls : ""), txt);
+    b.setAttribute("aria-label", label); b.title = label;
+    b.onclick = e => { e.stopPropagation(); fn(); };
+    return b;
+  }
+  function itemRow(v, label, count, acts){
+    const row = el("div", "item" + (curDeck === v ? " active" : ""));
+    const main = el("div", "iMain");
+    main.append(el("span", "dot"), el("span", "iName", label));
+    if (count != null) main.append(el("span", "iCount", String(count)));
+    main.onclick = () => pickItem(v);
+    row.append(main); if (acts) row.append(acts);
+    return row;
+  }
+  function buildDrawer(id){
+    const isB = id === "b", open = !!(DRAW && DRAW[id]);
+    const box = el("div", "drawer" + (open ? " open" : ""));
+    const names = isB ? Object.keys(DECKS) : Object.keys(USER);
+    let sub = names.length + (isB ? " themes" : " saved");
+    if (isB && curDeck.startsWith("b:")) sub = curDeck.slice(2);
+    if (!isB && curDeck.startsWith("u:")) sub = curDeck.slice(2);
+    if (!isB && curDeck === CUSTOM) sub = "your own words";
+    const head = el("button", "dHead"); head.setAttribute("aria-expanded", String(open));
+    head.append(el("span", "chev", "▸"), el("span", "dTitle", isB ? "Built-in themes" : "My themes (AI & custom)"), el("span", "dSub", sub));
+    head.onclick = () => { DRAW = DRAW || {}; DRAW[id] = !DRAW[id]; store.set("fg_drawers", JSON.stringify(DRAW)); renderDrawers(); };
+    const body = el("div", "dBody" + (!isB && moreFor && USER[moreFor] ? " tall" : "")); body.dataset.d = id;
+    if (isB) names.forEach(n => body.append(itemRow("b:" + n, n, DECKS[n].length)));
+    else {
+      names.forEach(n => {
+        const acts = el("div", "iActs");
+        acts.append(
+          mini("⬇", "Export", () => exportTheme(n)),
+          mini("✨", "AI: generate more", () => { moreFor = moreFor === n ? "" : n; moreMsg = { text: "", cls: "" }; renderDrawers(); }, moreFor === n ? "on" : ""),
+          mini(confirmClear === n ? "Sure?" : "🗑", "Clear this theme", () => clearTheme(n), confirmClear === n ? "warn" : ""));
+        body.append(itemRow("u:" + n, n, USER[n].length, acts));
+        if (moreFor === n) body.append(morePanel(n));
+      });
+      if (!names.length) body.append(el("div", "empty", "No AI themes yet. Use ✨ Generate a theme below to make one."));
+      body.append(itemRow(CUSTOM, "✍ Type my own words…", null));
+    }
+    box.append(head, body);
+    return box;
+  }
+
+  function morePanel(n){
+    const p = el("div", "more");
+    p.append(el("p", "hint", "Sends your " + USER[n].length + " current entries to Gemini so it finds different ones."));
+    const lab = el("label", null, "How many new entries?");
+    const inp = el("input"); inp.type = "number"; inp.min = 10; inp.max = 500; inp.step = 10; inp.value = moreCount; inp.disabled = moreBusy;
+    inp.oninput = () => { moreCount = Math.max(10, Math.min(500, parseInt(inp.value, 10) || 100)); };
+    lab.append(inp); p.append(lab);
+    const row = el("div", "row");
+    const add = el("button", null, moreBusy ? "Working…" : "＋ Add to list"); add.disabled = moreBusy; add.onclick = () => generateMore(n, "add");
+    const rep = el("button", "secondary", "↻ Replace list"); rep.disabled = moreBusy; rep.onclick = () => generateMore(n, "replace");
+    row.append(add, rep); p.append(row);
+    p.append(el("p", "hint", "Replace deletes the old entries once the new ones have arrived."));
+    const st = el("p", "status" + (moreMsg.cls ? " " + moreMsg.cls : ""), moreMsg.text); st.id = "moreStatus"; p.append(st);
+    if (moreMsg.needKey) { const b = el("button", "secondary", "Open ✨ Generate to add your key"); b.onclick = () => { phase = "gen"; show("gen"); }; p.append(b); }
+    if (undoInfo && undoInfo.name === n && !moreBusy) {
+      const u = el("button", "secondary", "↩ Undo last change (back to " + undoInfo.list.length + " entries)");
+      u.onclick = () => { USER[n] = undoInfo.list; undoInfo = null; saveUser(); moreMsg = { text: "Restored.", cls: "ok" }; renderDrawers(); };
+      p.append(u);
+    }
+    return p;
+  }
+  const setMore = (text, cls="") => {
+    moreMsg = { text, cls };
+    const e = $("#moreStatus"); if (e) { e.textContent = text; e.className = "status " + cls; }
+  };
+
+  function exportTheme(name){
+    const list = USER[name]; if (!list) return;
+    const txt = "// Exported from Forehead Game. Put this file in lists/ and add a <script src> tag for it in index.html.\n" +
+      "(window.LISTS = window.LISTS || {})[" + JSON.stringify(name) + "] = `\n" + list.join("\n") + "\n`;\n";
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([txt], { type: "text/javascript" }));
+    a.download = slug(name) + ".js";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    note("Exported " + a.download, "ok");
+  }
+  function clearTheme(n){            // two taps instead of a confirm popup
+    if (confirmClear !== n) {
+      confirmClear = n; renderDrawers();
+      setTimeout(() => { if (confirmClear === n) { confirmClear = ""; renderDrawers(); } }, 2500);
+      return;
+    }
+    confirmClear = ""; delete USER[n]; delete META[n]; saveUser();
+    if (moreFor === n) moreFor = "";
+    if (curDeck === "u:" + n) rebuildDecks(); else renderDrawers();
+    note('Cleared "' + n + '".');
+  }
+
+  $("#custom").value = store.get("fg_custom", "");
+  rebuildDecks();
+  if (!DRAW) { DRAW = { b: !curDeck || curDeck.startsWith("b:"), u: curDeck.startsWith("u:") || curDeck === CUSTOM }; renderDrawers(); }
+
+  $("#tiltDeg").value = store.get("fg_tilt", "40");
+  $("#tiltVal").textContent = $("#tiltDeg").value + "°";
+  $("#tiltDeg").oninput = e => { $("#tiltVal").textContent = e.target.value + "°"; store.set("fg_tilt", e.target.value); };
+  $("#secs").value = store.get("fg_secs", "60");
+  $("#secs").onchange = e => store.set("fg_secs", e.target.value);
+  const syncUnlimited = () => { $("#secs").disabled = $("#unlimited").checked; };
+  $("#unlimited").checked = store.get("fg_unlimited", "0") === "1"; syncUnlimited();
+  $("#unlimited").onchange = e => { store.set("fg_unlimited", e.target.checked ? "1" : "0"); syncUnlimited(); };
+  $("#settingsBtn").onclick = () => { phase = "settings"; show("settings"); };
+  $("#touchOn").checked = store.get("fg_touch", "1") !== "0";
+  $("#touchOn").onchange = e => store.set("fg_touch", e.target.checked ? "1" : "0");
+
+
+  /* ---------- Sensor ---------- */
+  // Tilt of the screen from vertical, in degrees (0 = upright on the forehead, +/-90 = facing floor/ceiling).
+  // It comes from the direction of gravity (accelerometer), smoothed, so a shake or bump can't fake a tilt.
+  // The sign differs between iOS and Android; "dir" (calibrated once) fixes that.
+  let ang = 0, angInit = false, lastT = 0, badSince = 0;
+  let sensorOn = false;
+  let dir = 0;               // +1 or -1: sign of the angle change when tilting DOWN. 0 = unknown.
+  try { dir = parseInt(localStorage.getItem("fg_dir") || "0", 10) || 0; } catch(e){}
+  const TAU = 80;            // smoothing time constant in ms (higher = calmer but slower)
+
+  function feed(deg, t){
+    if (!angInit) { ang = deg; angInit = true; }
+    else ang += (deg - ang) * (1 - Math.exp(-Math.max(1, Math.min(200, t - lastT)) / TAU));
+    lastT = t; sensorOn = true;
+  }
+
+  let motionSeen = false, sensorWhy = "";
+  function onMotion(e){
+    const a = e.accelerationIncludingGravity;
+    if (!a || a.x == null || a.y == null || a.z == null) return;
+    motionSeen = true;
+    const t = performance.now(), g = Math.hypot(a.x, a.y, a.z);
+    if (g < 1) return;
+    // Normalising by |g| removes most of the effect of linear acceleration. While the phone is being
+    // shaken hard the reading is unreliable, so skip it (but give up skipping after 1.5 s in case the
+    // device reports gravity in odd units).
+    if (Math.abs(g - 9.81) > 5) { if (!badSince) badSince = t; if (t - badSince < 1500) { sensorOn = true; return; } }
+    else badSince = 0;
+    feed(Math.asin(Math.max(-1, Math.min(1, a.z / g))) * 180 / Math.PI, t);
+  }
+  // Fallback if no accelerometer data: derive the same angle from the fused orientation angles
+  function onOrient(e){
+    if (motionSeen || e.beta == null || e.gamma == null) return;
+    const r = Math.PI / 180, zc = Math.cos(e.beta * r) * Math.cos(e.gamma * r);
+    feed(Math.asin(Math.max(-1, Math.min(1, zc))) * 180 / Math.PI, performance.now());
+  }
+  let listening = false;
+  function listen(){
+    if (listening) return; listening = true;
+    window.addEventListener("devicemotion", onMotion);
+    window.addEventListener("deviceorientation", onOrient);
+    window.addEventListener("deviceorientationabsolute", onOrient);
+  }
+
+  async function enableSensor(permP){
+    sensorWhy = "";
+    if (!window.isSecureContext) { sensorWhy = "This page isn't served over HTTPS (open the https:// GitHub Pages link, not a file)."; return false; }
+    // A refused/failed permission prompt is not fatal: some browsers expose the prompt API but still
+    // deliver motion data, so we listen anyway and only complain if nothing arrives.
+    let denied = "";
+    try {
+      if (permP) {
+        const r = await permP;
+        if (r !== "granted") denied = "Motion access was denied. On iPhone: fully close Safari, reopen the page and tap Allow (or Settings → Safari → Motion & Orientation Access).";
+      }
+    } catch(e){ denied = "Motion permission failed: " + (e && e.message || e); }
+    listen();
+    const t0 = performance.now();
+    while (!sensorOn && performance.now() - t0 < (denied ? 1500 : 3000)) await sleep(100);
+    if (!sensorOn) sensorWhy = denied || "No motion data received. On Android Chrome check Site settings → Motion sensors is allowed (and Battery saver is off); in-app browsers often block sensors, so use Chrome/Safari directly.";
+    return sensorOn;
+  }
+
+  // On platforms that need no permission prompt, start listening right away
+  if (typeof DeviceMotionEvent === "undefined" || typeof DeviceMotionEvent.requestPermission !== "function") listen();
+
+  /* ---------- Game state ---------- */
+  let words = [], queue = [], correct = [], passed = [];
+  let phase = "menu", armed = false, neutral = 0, lock = false, endAt = 0, wakeLock = null;
+  let touchMode = false;
+
+  const shuffle = a => { for (let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]];} return a; };
+  const nextWord = () => { if (!queue.length) queue = shuffle(words.slice()); return queue.pop(); };
+
+  function getWords(){
+    if (curDeck === CUSTOM) {
+      const txt = $("#custom").value;
+      try { localStorage.setItem("fg_custom", txt); } catch(e){}
+      return txt.split(/[,\n]/).map(s => s.trim()).filter(Boolean);
+    }
+    const v = curDeck;
+    if (v.startsWith("u:")) return USER[v.slice(2)] || [];
+    return v.startsWith("b:") ? (DECKS[v.slice(2)] || []) : [];
+  }
+
+  /* ---------- Feedback (sound / vibration) ---------- */
+  let ac;
+  function ctx(){
+    ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+    if (ac.state === "suspended") ac.resume();
+    return ac;
+  }
+  // Plain beep (countdown, start, end)
+  function beep(freq, dur=0.15){
+    try {
+      const c = ctx(), o = c.createOscillator(), g = c.createGain(), t = c.currentTime;
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(0.15, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + dur + 0.02);
+    } catch(e){}
+  }
+  // CLING: bright bell made of inharmonic partials with a fast attack and a ringing decay
+  function bell(){
+    try {
+      const c = ctx(), t0 = c.currentTime;
+      const strike = (t, f, vol) => {
+        [[1,1,1.3],[2.76,0.55,0.9],[5.4,0.3,0.55],[8.93,0.15,0.35]].forEach(([ratio, amp, dec]) => {
+          const o = c.createOscillator(), g = c.createGain();
+          o.type = "sine"; o.frequency.value = f * ratio;
+          g.gain.setValueAtTime(0.0001, t);
+          g.gain.exponentialRampToValueAtTime(vol * amp, t + 0.004);
+          g.gain.exponentialRampToValueAtTime(0.0001, t + dec);
+          o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + dec + 0.05);
+        });
+      };
+      strike(t0, 1320, 0.28);          // main hit
+      strike(t0 + 0.09, 1980, 0.18);   // quick higher "ling" on top
+    } catch(e){}
+  }
+  // BRRRROMP: growling sawtooth sliding down, chopped by a fast tremolo, then a final low "omp"
+  function womp(){
+    try {
+      const c = ctx(), t = c.currentTime, end = t + 0.75;
+      const o1 = c.createOscillator(), o2 = c.createOscillator();
+      o1.type = "sawtooth"; o2.type = "square";
+      o1.frequency.setValueAtTime(250, t);
+      o1.frequency.exponentialRampToValueAtTime(150, t + 0.4);
+      o1.frequency.exponentialRampToValueAtTime(70, end);
+      o2.frequency.setValueAtTime(252, t);
+      o2.frequency.exponentialRampToValueAtTime(152, t + 0.4);
+      o2.frequency.exponentialRampToValueAtTime(71, end);
+      const lp = c.createBiquadFilter(); lp.type = "lowpass";
+      lp.frequency.setValueAtTime(1400, t); lp.frequency.exponentialRampToValueAtTime(300, end);
+      // "brrrr": fast amplitude wobble
+      const grow = c.createGain(); grow.gain.value = 0.55;
+      const lfo = c.createOscillator(), lfoAmt = c.createGain();
+      lfo.frequency.value = 38; lfoAmt.gain.value = 0.45;
+      lfo.connect(lfoAmt); lfoAmt.connect(grow.gain);
+      const env = c.createGain();
+      env.gain.setValueAtTime(0.0001, t);
+      env.gain.exponentialRampToValueAtTime(0.32, t + 0.02);
+      env.gain.setValueAtTime(0.32, t + 0.5);
+      env.gain.exponentialRampToValueAtTime(0.0001, end);
+      o1.connect(lp); o2.connect(lp); lp.connect(grow); grow.connect(env); env.connect(c.destination);
+      [o1, o2, lfo].forEach(o => { o.start(t); o.stop(end + 0.05); });
+    } catch(e){}
+  }
+  const buzz = p => { try { navigator.vibrate && navigator.vibrate(p); } catch(e){} };
+
+  /* ---------- Flow ---------- */
+  let run = 0;
+  const CANCEL = {};
+  async function start(){
+    const my = ++run;
+    try { await startInner(my); } catch(e){ if (e !== CANCEL) throw e; }
+  }
+  async function startInner(my){
+    const nap = async ms => { await sleep(ms); if (my !== run) throw CANCEL; };
+    words = getWords();
+    if (!curDeck) { note("Pick a theme first.", "err"); return; }
+    if (words.length < 3) { note("Need at least 3 entries in the theme.", "err"); return; }
+    store.set("fg_deck", curDeck);
+
+    // Must be called directly from the tap (iOS permission + fullscreen)
+    const permP = (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function")
+      ? DeviceMotionEvent.requestPermission() : null;
+    try { document.documentElement.requestFullscreen?.().then(() => screen.orientation?.lock?.("landscape").catch(()=>{})).catch(()=>{}); } catch(e){}
+    try { navigator.wakeLock?.request("screen").then(l => wakeLock = l).catch(()=>{}); } catch(e){}
+    beep(1, 0.01); // unlock audio
+
+    show("prep");
+    $("#prepMsg").textContent = "Starting sensors…"; $("#prepSub").textContent = "";
+    phase = "prep";
+    if (!sensorOn || permP) await enableSensor(permP);
+    if (my !== run) throw CANCEL;
+    touchMode = !sensorOn;
+
+    if (touchMode) {
+      neutral = 0;
+      $("#prepMsg").textContent = "No motion sensor found";
+      $("#prepSub").textContent = sensorWhy + "  Touch mode: tap the bottom half = correct, top half = pass.";
+      $("#touchOn").checked = true;
+      await nap(5000);
+    } else {
+      // 1. Put on forehead, sample neutral pose
+      for (let i = 5; i >= 1; i--) {
+        $("#prepMsg").textContent = "Put the phone on your forehead 🤳";
+        $("#prepSub").textContent = "Screen facing out, hold it upright… " + i;
+        if (i === 1) { // average over last second
+          let sum = 0, n = 0; const t0 = performance.now();
+          while (performance.now() - t0 < 1000) { sum += ang; n++; await nap(30); }
+          neutral = sum / n;
+        } else await nap(1000);
+      }
+      // 2. One-time calibration of tilt direction (iOS and Android differ in sign)
+      if (!dir) {
+        $("#prepMsg").textContent = "Now tilt DOWN ⬇️";
+        $("#prepSub").textContent = "Screen towards the floor, like you got it right";
+        const t0 = performance.now();
+        while (Math.abs(ang - neutral) < 30 && performance.now() - t0 < 12000) await nap(40);
+        dir = (ang - neutral) >= 0 ? 1 : -1;
+        try { localStorage.setItem("fg_dir", String(dir)); } catch(e){}
+        buzz(80); beep(660);
+        $("#prepMsg").textContent = "Good! Back up ⬆️";
+        $("#prepSub").textContent = "";
+        const t1 = performance.now();
+        while (Math.abs(ang - neutral) > 15 && performance.now() - t1 < 8000) await nap(40);
+        await nap(500);
+      }
+    }
+
+    beginRound();      // straight into the round: no 3-2-1
+  }
+
+  let unlimitedRound = false, startAt = 0, finishArmed = false;
+  const fmtTime = n => n >= 60 ? Math.floor(n / 60) + ":" + String(n % 60).padStart(2, "0") : String(n);
+  $("#finishBtn").onclick = () => {                   // two taps, so a finger on the edge can't end the round
+    if (!finishArmed) {
+      finishArmed = true; $("#finishBtn").textContent = "Tap again to finish";
+      setTimeout(() => { finishArmed = false; $("#finishBtn").textContent = "Finish round"; }, 2500);
+    } else endRound();
+  };
+  function beginRound(){
+    const secs = Math.max(5, parseInt($("#secs").value, 10) || 60);       // no upper limit
+    unlimitedRound = $("#unlimited").checked;
+    correct = []; passed = []; queue = []; armed = false; lock = false; holdDir = 0;
+    startAt = performance.now();
+    endAt = unlimitedRound ? Infinity : startAt + secs * 1000;
+    $("#finishBtn").style.display = unlimitedRound ? "block" : "none";
+    $("#finishBtn").textContent = "Finish round"; finishArmed = false;
+    phase = "play";
+    $("#score").textContent = 0;
+    $("#word").textContent = nextWord();
+    $("#game").className = "screen active";
+    show("game"); beep(880, 0.25); buzz(150);
+  }
+
+  const FLASH_MS = 450;       // how long the full-screen CORRECT / PASS flash lasts
+  function answer(kind){
+    if (phase !== "play" || lock) return;
+    lock = true; armed = false; holdDir = 0;
+    const w = $("#word").textContent;
+    const g = $("#game");
+    if (kind === "ok") { correct.push(w); g.classList.add("ok"); $("#word").textContent = "✔ CORRECT!"; bell(); buzz(60); }
+    else { passed.push(w); g.classList.add("pass"); $("#word").textContent = "PASS"; womp(); buzz([40,40,40]); }
+    $("#score").textContent = correct.length;
+    setTimeout(() => {
+      g.classList.remove("ok","pass");
+      if (phase === "play") $("#word").textContent = nextWord();
+      lock = false;
+      // Must return to neutral before next answer registers
+      armed = false;
+    }, FLASH_MS);
+  }
+
+  function endRound(){
+    phase = "results";
+    $("#results .sub").textContent = unlimitedRound ? "Round over! (" + fmtTime(Math.floor((performance.now() - startAt) / 1000)) + ")" : "Time's up!";
+    $("#finishBtn").style.display = "none";
+    beep(520, 0.4); buzz(400);
+    $("#finalScore").textContent = correct.length;
+    const ul = $("#resList"); ul.innerHTML = "";
+    correct.forEach(w => { const li = document.createElement("li"); li.className = "c"; li.textContent = "✔ " + w; ul.appendChild(li); });
+    passed.forEach(w => { const li = document.createElement("li"); li.className = "p"; li.textContent = "✘ " + w; ul.appendChild(li); });
+    show("results");
+    try { wakeLock && wakeLock.release(); wakeLock = null; } catch(e){}
+    try { document.fullscreenElement && document.exitFullscreen(); } catch(e){}
+  }
+
+  /* ---------- Main loop ---------- */
+  const HOLD_MS = 150;                      // the tilt must stay past the threshold this long
+  const tiltDeg = () => parseInt($("#tiltDeg").value, 10) || 40;
+  const rearmDeg = () => Math.max(12, tiltDeg() * 0.5);   // come back this close to upright before the next answer
+  let holdDir = 0, holdSince = 0;
+  setInterval(() => {
+    if (phase !== "play") return;
+    const now = performance.now();
+    if (unlimitedRound) $("#timer").textContent = fmtTime(Math.floor((now - startAt) / 1000));     // counts up
+    else {
+      const left = Math.max(0, endAt - now);
+      $("#timer").textContent = fmtTime(Math.ceil(left / 1000));
+      if (left <= 0) { endRound(); return; }
+    }
+    if (touchMode || lock) { holdDir = 0; return; }
+    const d = (ang - neutral) * dir;         // + = tilted down, − = tilted up (degrees)
+    if (!armed) {
+      holdDir = 0;
+      if (Math.abs(d) < rearmDeg()) armed = true;
+      return;
+    }
+    // slowly follow small drifts of the resting pose (head posture changes over a round)
+    if (Math.abs(d) < rearmDeg() * 0.6) neutral += (ang - neutral) * 0.01;
+    const th = tiltDeg(), want = d > th ? 1 : d < -th ? -1 : 0;
+    if (want !== holdDir) { holdDir = want; holdSince = now; }
+    else if (want && now - holdSince >= HOLD_MS) { holdDir = 0; answer(want > 0 ? "ok" : "pass"); }
+  }, 30);
+
+  /* ---------- Touch / keyboard fallback ---------- */
+  $("#game").addEventListener("pointerdown", e => {
+    if (!(touchMode || $("#touchOn").checked) || e.target.closest(".backBtn") || e.target.closest(".finishBtn")) return;
+    answer(e.clientY > innerHeight / 2 ? "ok" : "pass");
+  });
+  window.addEventListener("keydown", e => {
+    if (phase !== "play") return;
+    if (e.key === "ArrowDown") answer("ok");
+    if (e.key === "ArrowUp") answer("pass");
+  });
+
+
+  /* ---------- AI theme generator (Gemini, called straight from the browser) ---------- */
+  const API = "https://generativelanguage.googleapis.com/v1beta";
+  $("#apiKey").value = store.get("fg_gemini_key", "");
+  $("#genModel").value = store.get("fg_model", "");
+  $("#apiKey").onchange = () => store.set("fg_gemini_key", $("#apiKey").value.trim());
+  $("#genModel").onchange = () => { store.set("fg_model", $("#genModel").value.trim()); store.del("fg_models_auto"); };
+  $("#genOpenBtn").onclick = () => { phase = "gen"; show("gen"); };
+
+  const gstat = (msg, cls="") => { const e = $("#genStatus"); e.textContent = msg; e.className = "status " + cls; };
+
+  // The prompt: this is what decides the quality of the lists.
+  function buildPrompt(theme, total, avoid){
+    const task = avoid && avoid.length
+      ? `ALREADY IN THE LIST (${avoid.length} entries). Do NOT repeat any of them, nor near-duplicates or other spellings of them. Find DIFFERENT items that fit the same theme, in the same style and difficulty mix:\n${avoid.slice(0, 1000).join("\n")}\n\nWrite ${total} different NEW entries that belong to this theme.`
+      : `Write ${total} different entries that belong to this theme.`;
+    return `You are writing the word list for a party guessing game (like Heads Up! or charades). One player holds a phone on their forehead; their friends give spoken clues or act things out until that player guesses the word on the screen.
+
+THEME: ${JSON.stringify(theme)}
+
+${task}
+
+Requirements:
+1. Guessable: every entry must be something most players would recognise and be able to describe or act out. Prefer well-known, specific things over obscure ones. If the theme is niche, stick to the best-known items of that niche.
+2. Format: each entry is a name or short phrase of 1 to 5 words, in its most common form. No numbering, explanations, parentheses, quotes or notes, and no years unless they are part of the name.
+3. Distinct: no duplicates or near-duplicates (the same thing spelled differently, or many sequels or variants of one thing).
+4. Difficulty mix: roughly 50% easy, 35% medium, 15% hard.
+5. Breadth: cover the whole theme and its different sub-areas instead of clustering on one. Put the entries in random order.
+6. Language: write the entries in the same language as the theme (a theme written in French gets French entries), except for names or titles that are normally kept in their original language.
+7. Real and accurate: only include things that really exist, unless the theme is explicitly fictional. Never invent entries.
+8. Keep everything suitable for a general audience: no slurs, no graphic or sexual content.
+9. If the theme is ambiguous, choose the most common reading for a party game.
+
+Return JSON only, in the form {"entries": ["...", "..."]}.`;
+  }
+
+  const norm = e => e.normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+  function cleanEntries(arr){
+    const seen = new Set(), out = [];
+    for (let e of arr) {
+      if (typeof e !== "string") continue;
+      e = e.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "").replace(/[`\\"“”]/g, "").replace(/\$\{/g, "").replace(/\s+/g, " ").trim();
+      if (!e || e.length > 60) continue;
+      const k = norm(e) || e.toLowerCase();
+      if (seen.has(k)) continue;
+      seen.add(k); out.push(e);
+    }
+    return out;
+  }
+  function parseEntries(text){
+    try {
+      const j = JSON.parse(text);
+      const a = Array.isArray(j) ? j : (j && Array.isArray(j.entries) ? j.entries : null);
+      if (a) return cleanEntries(a);
+    } catch(e){}
+    return cleanEntries(text.split(/\r?\n/));      // fallback if the model ignored the JSON format
+  }
+
+  // Ranked list of usable models: fast Flash-Lite first, then Flash; newer and stable versions first.
+  async function pickModels(key){
+    const r = await fetch(API + "/models?pageSize=200&key=" + encodeURIComponent(key));
+    if (!r.ok) { const e = new Error("Could not list models (" + r.status + ")"); e.status = r.status; throw e; }
+    const data = await r.json();
+    const cands = (data.models || []).filter(m =>
+      (m.supportedGenerationMethods || []).includes("generateContent") &&
+      /^models\/gemini-\d/.test(m.name) && /flash/.test(m.name) &&
+      !/image|tts|audio|live|embedding|robotics|computer|thinking|native|vision|learnlm|-exp/.test(m.name));
+    const rank = m => [/lite/.test(m.name) ? 1 : 0, /preview/.test(m.name) ? 0 : 1,
+                       parseFloat((m.name.match(/gemini-(\d+(?:\.\d+)?)/) || [0,0])[1])];
+    cands.sort((x, y) => { const a = rank(x), b = rank(y); return b[0]-a[0] || b[1]-a[1] || b[2]-a[2]; });
+    if (!cands.length) throw new Error("No usable Gemini model found for this key");
+    return cands.slice(0, 4).map(m => m.name.replace(/^models\//, ""));
+  }
+
+  // Thinking models spend most of their time "thinking" before answering, which is slow and useless for
+  // a word list. We ask for no/minimal thinking; models that don't accept a setting make us fall to the next one.
+  // Request variants, tried in order. Google's 400 error is often just "invalid argument" with no hint
+  // about which setting the model dislikes, so ANY 400 (except a bad key) moves on to the next variant.
+  const THINK = [
+    { think: { thinkingBudget: 0 } },
+    { think: { thinkingLevel: "minimal" } },
+    { think: { thinkingLevel: "low" } },
+    { think: null },
+    { think: null, plain: true }          // last resort: no thinking setting and no response schema
+  ];
+  async function callGemini(key, model, prompt, v){
+    const res = await fetch(API + "/models/" + encodeURIComponent(model) + ":generateContent?key=" + encodeURIComponent(key), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 1, maxOutputTokens: 8192, responseMimeType: "application/json",
+          ...(v.think ? { thinkingConfig: v.think } : {}),
+          ...(v.plain ? {} : { responseSchema: { type: "OBJECT", properties: { entries: { type: "ARRAY", items: { type: "STRING" } } }, required: ["entries"] } })
+        }
+      })
+    });
+    let data = null; try { data = await res.json(); } catch(e){}
+    if (!res.ok) { const err = new Error((data && data.error && data.error.message) || res.statusText); err.status = res.status; throw err; }
+    const cand = data && data.candidates && data.candidates[0];
+    if (!cand) throw new Error("Gemini refused this theme" + (data && data.promptFeedback && data.promptFeedback.blockReason ? " (" + data.promptFeedback.blockReason + ")" : "") + ". Try rewording it.");
+    const text = ((cand.content && cand.content.parts) || []).map(p => p.text || "").join("");
+    if (!text) throw new Error("Gemini returned an empty answer (" + (cand.finishReason || "unknown reason") + ").");
+    return text;
+  }
+
+  function friendly(e){
+    const tech = " [" + (e.name || "Error") + ": " + (e.message || "") + (e.status ? ", HTTP " + e.status : "") + "]";
+    if (e.name === "TimeoutError") return "Every model we tried took too long (45 seconds each). Google\'s free tier may be overloaded: try again in a minute, ask for fewer entries, or type a model name under Advanced.";
+    if (!e.status && (e instanceof TypeError || e.name === "NetworkError" || /NetworkError|Failed to fetch|Load failed|fetch resource/i.test(e.message || "")))
+      return "Could not reach Google's Gemini server from this browser. Usual causes: an ad blocker, tracking protection or private DNS blocking generativelanguage.googleapis.com, a VPN, or no connection. Try a private tab or another browser to compare." + tech;
+    if (e.status === 400 && /api key/i.test(e.message)) return "Gemini rejected the API key. Check that you pasted all of it.";
+    if (e.status === 401 || e.status === 403) return "Access denied (" + e.message + ")";
+    if (e.status === 429) return "Free-tier rate limit or daily quota reached. Wait a minute and try again.";
+    return (e.message || String(e)) + tech;
+  }
+
+  const keyOf = e => norm(e) || e.toLowerCase();
+  const TMO = 45000;       // per attempt: a model that is this slow gets skipped for the next one
+
+  // Live status with an elapsed-seconds counter
+  function progress(setter){
+    const t0 = Date.now(); let msg = "Starting…";
+    const paint = () => setter(msg + " (" + Math.round((Date.now() - t0) / 1000) + "s)");
+    const tick = setInterval(paint, 1000);
+    return { prog: m => { msg = m; paint(); }, stop: () => clearInterval(tick), secs: () => Math.round((Date.now() - t0) / 1000) };
+  }
+
+  // Sends a prompt to Gemini: picks models, adapts the request format, skips slow models, retries.
+  // Returns { text, model }.
+  async function askGemini(key, prompt, prog){
+    // No AbortSignal on purpose: Firefox can't pass it through the service worker ("could not be cloned")
+    let timer;
+    const withTimeout = p => Promise.race([p, new Promise((_, rej) => {
+      timer = setTimeout(() => { const t = new Error("timeout"); t.name = "TimeoutError"; rej(t); }, TMO);
+    })]);
+    const manual = $("#genModel").value.trim();
+    const loadModels = async () => {
+      prog("Looking for available Gemini models…");
+      try { const l = await pickModels(key); store.set("fg_models_auto", JSON.stringify(l)); return l; }
+      catch(e){ if (e.status) throw e; return ["gemini-2.5-flash-lite", "gemini-2.5-flash"]; }
+    };
+    try {
+      let models;
+      if (manual) models = [manual];
+      else { try { models = JSON.parse(store.get("fg_models_auto", "null")); } catch(e){} if (!Array.isArray(models) || !models.length) models = await loadModels(); }
+      let tries = 0, redetected = false, mi = 0;
+      let ti = Math.min(THINK.length - 1, parseInt(store.get("fg_think", "0"), 10) || 0);
+      for (;;) {
+        const model = models[mi];
+        prog("Asking " + model + "…");
+        try { const text = await withTimeout(callGemini(key, model, prompt, THINK[ti])); clearTimeout(timer); store.set("fg_think", String(ti)); return { text, model }; }
+        catch(e){
+          clearTimeout(timer);
+          if (e.status === 400 && !/api key/i.test(e.message) && ti < THINK.length - 1) { ti++; prog("Trying a different request format…"); continue; }
+          if (e.status === 404 && !manual && !redetected) {          // cached model list is out of date
+            redetected = true; store.del("fg_models_auto"); models = await loadModels(); mi = 0; continue;
+          }
+          if (e.name === "TimeoutError" && mi < models.length - 1) { mi++; prog(model + " is too slow, trying " + models[mi] + "…"); continue; }
+          if ((e.status === 500 || e.status === 503) && ++tries < 3) { prog("Gemini is busy, retrying…"); await sleep(1500 * tries); continue; }
+          throw e;
+        }
+      }
+    } finally { clearTimeout(timer); }
+  }
+
+  /* ----- Generate screen ----- */
+  let genRun = 0, lastGenTheme = "";
+  $("#genBtn").onclick = async () => {
+    const my = ++genRun;
+    const key = $("#apiKey").value.trim();
+    const theme = $("#genTheme").value.replace(/\s+/g, " ").trim();
+    const want = Math.max(10, Math.min(500, parseInt($("#genCount").value, 10) || 150));
+    $("#genOut").classList.remove("on");
+    if (!key) return gstat("Paste your Gemini API key first.", "err");
+    if (!theme) return gstat("Type a theme first.", "err");
+    store.set("fg_gemini_key", key);
+    const btn = $("#genBtn"); btn.disabled = true; btn.textContent = "Generating…";
+    const pg = progress(m => gstat(m));
+    try {
+      const total = want + Math.ceil(want * 0.15);          // ask for extra, duplicates get removed then we trim
+      const { text, model } = await askGemini(key, buildPrompt(theme, total), m => pg.prog(m.replace(/…$/, "") + " for " + want + " entries…"));
+      if (my !== genRun) return;
+      const entries = parseEntries(text).slice(0, want);
+      if (entries.length < 3) throw new Error("Gemini did not return a usable list. Try again or reword the theme.");
+      lastGenTheme = theme;
+      $("#genName").value = theme.length > 40 ? theme.slice(0, 40).trim() : theme;
+      $("#genList").value = entries.join("\n");
+      updateGenCount();
+      $("#genOut").classList.add("on");
+      gstat("Done in " + pg.secs() + "s with " + model + ". Review the list below, remove anything you don't like, then save.", "ok");
+      $("#genOut").scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch(e){
+      if (my === genRun) gstat(friendly(e), "err");
+    } finally {
+      pg.stop(); btn.disabled = false; btn.textContent = "Generate";
+    }
+  };
+
+  /* ----- "AI generate more" for a saved theme: sends the current list so the model avoids it ----- */
+  async function generateMore(name, mode){
+    if (moreBusy || !USER[name]) return;
+    const key = ($("#apiKey").value || store.get("fg_gemini_key", "")).trim();
+    if (!key) { moreMsg = { text: "Add your Gemini API key first (on the ✨ Generate screen).", cls: "err", needKey: true }; renderDrawers(); return; }
+    const old = USER[name].slice(), want = Math.max(10, Math.min(500, moreCount || 100));
+    moreBusy = true; undoInfo = null; setMore("Starting…"); renderDrawers();
+    const pg = progress(m => setMore(m));
+    try {
+      const total = want + Math.ceil(want * 0.3);          // extra, because some will be repeats
+      const { text, model } = await askGemini(key, buildPrompt(META[name] || name, total, old), m => pg.prog(m.replace(/…$/, "") + " for " + want + " new entries…"));
+      const seen = new Set(old.map(keyOf));
+      const parsed = parseEntries(text);
+      const fresh = parsed.filter(e => !seen.has(keyOf(e))).slice(0, want);
+      const repeats = parsed.length - parsed.filter(e => !seen.has(keyOf(e))).length;
+      if (mode === "replace") { if (fresh.length < 10) throw new Error("Gemini returned only " + fresh.length + " new entries, so your list was kept. Try again."); }
+      else if (!fresh.length) throw new Error("Gemini only returned entries you already have. Try again or ask for more.");
+      undoInfo = { name, list: old };
+      USER[name] = mode === "replace" ? fresh : old.concat(fresh);
+      saveUser();
+      moreMsg = { text: (mode === "replace" ? "Replaced the list with " + fresh.length + " new entries" : "Added " + fresh.length + " new entries (now " + USER[name].length + ")") +
+        " in " + pg.secs() + "s with " + model + (repeats ? ". " + repeats + (repeats === 1 ? " repeat" : " repeats") + " skipped" : "") + ".", cls: "ok" };
+    } catch(e){
+      moreMsg = { text: friendly(e), cls: "err" };
+    } finally {
+      pg.stop(); moreBusy = false; renderDrawers();
+    }
+  }
+
+  const listFromBox = () => cleanEntries($("#genList").value.split(/\r?\n/));
+  const updateGenCount = () => { $("#genCountLbl").textContent = "Entries (" + listFromBox().length + ")"; };
+  $("#genList").oninput = updateGenCount;
+  $("#genDiscardBtn").onclick = () => { $("#genOut").classList.remove("on"); gstat(""); };
+  $("#genSaveBtn").onclick = () => {
+    const list = listFromBox();
+    let name = $("#genName").value.replace(/\s+/g, " ").trim().slice(0, 40);
+    if (!name) return gstat("Give the theme a name.", "err");
+    if (list.length < 3) return gstat("A theme needs at least 3 entries.", "err");
+    const base = name; for (let i = 2; USER[name]; i++) name = base + " " + i;      // never overwrite an older theme
+    USER[name] = list; META[name] = lastGenTheme || name;
+    const ok = saveUser();
+    rebuildDecks("u:" + name); store.set("fg_deck", "u:" + name);
+    $("#genOut").classList.remove("on"); gstat(""); phase = "menu"; show("menu");
+    $("#menuNote").className = "status " + (ok ? "ok" : "err");
+    $("#menuNote").textContent = ok ? '✔ Saved "' + name + '" (' + list.length + " entries) under My themes."
+      : '⚠ Could not save to this browser (private mode?). "' + name + '" is usable until you close the page; use Export to keep it.';
+  };
+
+  /* ---------- Buttons ---------- */
+  $("#startBtn").onclick = start;
+  $("#againBtn").onclick = start;
+  function goBack(){
+    run++; genRun++; phase = "menu"; lock = false;
+    $("#game").classList.remove("ok","pass");
+    show("menu");
+    try { wakeLock && wakeLock.release(); wakeLock = null; } catch(e){}
+    try { document.fullscreenElement && document.exitFullscreen(); } catch(e){}
+  }
+  $("#menuBtn").onclick = goBack;
+  document.querySelectorAll(".backBtn").forEach(b => b.onclick = goBack);
+  window.addEventListener("keydown", e => { if (e.key === "Escape" && phase !== "menu" && !(e.target && e.target.tagName === "INPUT")) goBack(); });
+  $("#recalBtn").onclick = () => {
+    dir = 0; try { localStorage.removeItem("fg_dir"); } catch(e){}
+    $("#recalBtn").textContent = "✔ Will recalibrate next game";
+  };
+  // Live sensor status on the menu (helps diagnose browsers that block sensors)
+  setInterval(() => {
+    if (phase !== "settings") return;
+    const ua = navigator.userAgent;
+    const note = !isSecureContext ? "⚠ Not HTTPS: motion sensors are blocked on this page."
+      : sensorOn ? "✔ Motion sensor working (tilt " + Math.round(ang) + "°)"
+      : "Sensor: no data yet (move your phone). " + (/Firefox/.test(ua) ? "Firefox: see tips below." : "");
+    $("#sensorNote").textContent = note;
+  }, 300);
+
+  /* ---------- PWA: make it installable / offline ---------- */
+  if ("serviceWorker" in navigator && window.isSecureContext) {
+    window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+  }
+})();
+</script>
+</body>
+</html>

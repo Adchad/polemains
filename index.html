@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#111827">
+<meta name="theme-color" content="#f4f0e8">
 <title>Forehead Game</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="icons/icon-192.png">
@@ -84,9 +84,76 @@
   ul.res li.p{border-left:5px solid #ef4444;opacity:.8}
   .score{font-size:4rem;font-weight:800;margin:0}
   .row{display:flex;gap:12px}.row>*{flex:1}
+
+  /* ---------- Warm editorial visual direction ---------- */
+  :root{
+    color-scheme:light;
+    --paper:#f4f0e8;
+    --surface:#fbf8f1;
+    --surface-alt:#eee9df;
+    --ink:#30332e;
+    --muted:#77776d;
+    --line:#d8d1c5;
+    --line-soft:#e6e0d5;
+    --terracotta:#c47b62;
+    --terracotta-dark:#a9634d;
+    --sage:#87977a;
+    --sage-light:#e3e8dc;
+    --ochre:#c1a36b;
+    --danger:#b86e5c;
+  }
+  html,body{background:var(--paper);color:var(--ink)}
+  body{isolation:isolate}
+  #ambient{position:fixed;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none;opacity:.78}
+  .screen{background:transparent}
+  h1{color:var(--ink);letter-spacing:-.035em}
+  p.sub,.small,.dSub{color:var(--muted)}
+  a{color:var(--terracotta-dark)}
+  select,textarea,input[type=number],input[type=text],input[type=password]{
+    border:1px solid var(--line);border-radius:8px;background:var(--surface);
+    color:var(--ink);accent-color:var(--sage)
+  }
+  input::placeholder,textarea::placeholder{color:#9a978d}
+  button{
+    border-radius:9px;background:var(--terracotta);color:#fffaf4;
+    transition:background .15s ease,transform .12s ease
+  }
+  button:active{transform:translateY(1px)}
+  button:hover:not(:disabled){background:var(--terracotta-dark)}
+  button.secondary{background:var(--surface-alt);color:var(--ink);border:1px solid var(--line)}
+  button.secondary:hover:not(:disabled){background:#e5ded1}
+  .drawer{border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+  .dHead{color:var(--ink)}
+  .dBody{border-top:1px solid var(--line)}
+  .item{border-bottom:1px solid var(--line-soft)}
+  .item.active{background:var(--sage-light)}
+  .dot{border-color:#aaa99e}
+  .item.active .dot{background:var(--sage);border-color:var(--sage)}
+  .mini{border-radius:7px;background:var(--surface-alt);color:var(--ink);border:1px solid var(--line);font-size:.78rem;min-width:0;padding:6px 8px}
+  .mini:hover:not(:disabled){background:#e5ded1}
+  .mini.on{background:var(--sage-light);color:#465440;border-color:#c5d0bb}
+  .mini.warn{background:#f1dfd8;color:#854b3e;border-color:#e3c6bb}
+  .more{background:#f1ede4;border-bottom:1px solid var(--line);border-radius:0}
+  .status{color:var(--muted)}
+  .status.err{color:#a65343}.status.ok{color:#657b59}
+  #game{background:transparent;color:var(--ink)}
+  #game.ok{background:#87977a;color:#fffaf4}
+  #game.pass{background:#c47b62;color:#fffaf4}
+  .backBtn,.finishBtn{background:#e8e2d7;color:var(--ink);border:1px solid var(--line);border-radius:8px}
+  .backBtn:hover:not(:disabled),.finishBtn:hover:not(:disabled){background:#ded7ca}
+  ul.res li{background:var(--surface-alt);border-radius:6px}
+  ul.res li.c{border-left-color:var(--sage)}
+  ul.res li.p{border-left-color:var(--terracotta)}
+  .score{color:var(--ink)}
+  .dHead .chev{color:var(--terracotta)}
+  details summary{color:var(--muted)}
+  input[type=checkbox],input[type=range]{accent-color:var(--sage)}
+  ::selection{background:#e7d4c8;color:var(--ink)}
+
 </style>
 </head>
 <body>
+<canvas id="ambient" aria-hidden="true"></canvas>
 
 <!-- MENU -->
 <section id="menu" class="screen scroll active">
@@ -100,8 +167,8 @@
     </label>
     <button id="startBtn">Start</button>
     <div class="row">
-      <button class="secondary" id="genOpenBtn">✨ Generate a theme</button>
-      <button class="secondary" id="settingsBtn">⚙ Settings</button>
+      <button class="secondary" id="genOpenBtn">Generate a theme</button>
+      <button class="secondary" id="settingsBtn">Settings</button>
     </div>
   </div>
 </section>
@@ -110,7 +177,7 @@
 <section id="settings" class="screen scroll">
   <div class="card">
     <button class="secondary backBtn inline" aria-label="Back">← Back</button>
-    <h1 style="font-size:1.5rem">⚙ Settings</h1>
+    <h1 style="font-size:1.5rem">Settings</h1>
     <label>Round length (seconds)
       <input type="number" id="secs" value="60" min="5" step="5" inputmode="numeric">
     </label>
@@ -129,7 +196,7 @@
 <section id="gen" class="screen scroll">
   <div class="card">
     <button class="secondary backBtn inline" aria-label="Back">← Back</button>
-    <h1 style="font-size:1.5rem">✨ Generate a theme</h1>
+    <h1 style="font-size:1.5rem">Generate a theme</h1>
     <label>Gemini API key
       <input type="password" id="apiKey" placeholder="AIza..." autocomplete="off" autocapitalize="off" spellcheck="false">
     </label>
@@ -176,7 +243,7 @@
   <button class="secondary finishBtn" id="finishBtn" style="display:none">Finish round</button>
   <div id="hud"><span id="timer">60</span><span id="score">0</span></div>
   <div class="big" id="word"></div>
-  <div id="rotate">↻ Rotate your phone to landscape</div>
+  <div id="rotate">Rotate your phone to landscape</div>
 </section>
 
 <!-- RESULTS -->
@@ -292,22 +359,29 @@
     if (!isB && curDeck.startsWith("u:")) sub = curDeck.slice(2);
     if (!isB && curDeck === CUSTOM) sub = "your own words";
     const head = el("button", "dHead"); head.setAttribute("aria-expanded", String(open));
-    head.append(el("span", "chev", "▸"), el("span", "dTitle", isB ? "Built-in themes" : "My themes (AI & custom)"), el("span", "dSub", sub));
-    head.onclick = () => { DRAW = DRAW || {}; DRAW[id] = !DRAW[id]; store.set("fg_drawers", JSON.stringify(DRAW)); renderDrawers(); };
+    head.append(el("span", "chev", "›"), el("span", "dTitle", isB ? "Built-in themes" : "My themes (AI & custom)"), el("span", "dSub", sub));
+    head.onclick = () => {
+      DRAW = DRAW || {};
+      const willOpen = !DRAW[id];
+      DRAW[id] = willOpen;
+      if (willOpen) DRAW[id === "b" ? "u" : "b"] = false;
+      store.set("fg_drawers", JSON.stringify(DRAW));
+      renderDrawers();
+    };
     const body = el("div", "dBody" + (!isB && moreFor && USER[moreFor] ? " tall" : "")); body.dataset.d = id;
     if (isB) names.forEach(n => body.append(itemRow("b:" + n, n, DECKS[n].length)));
     else {
       names.forEach(n => {
         const acts = el("div", "iActs");
         acts.append(
-          mini("⬇", "Export", () => exportTheme(n)),
-          mini("✨", "AI: generate more", () => { moreFor = moreFor === n ? "" : n; moreMsg = { text: "", cls: "" }; renderDrawers(); }, moreFor === n ? "on" : ""),
-          mini(confirmClear === n ? "Sure?" : "🗑", "Clear this theme", () => clearTheme(n), confirmClear === n ? "warn" : ""));
+          mini("Export", "Export", () => exportTheme(n)),
+          mini("More", "Generate more entries with AI", () => { moreFor = moreFor === n ? "" : n; moreMsg = { text: "", cls: "" }; renderDrawers(); }, moreFor === n ? "on" : ""),
+          mini(confirmClear === n ? "Sure?" : "Clear", "Clear this theme", () => clearTheme(n), confirmClear === n ? "warn" : ""));
         body.append(itemRow("u:" + n, n, USER[n].length, acts));
         if (moreFor === n) body.append(morePanel(n));
       });
-      if (!names.length) body.append(el("div", "empty", "No AI themes yet. Use ✨ Generate a theme below to make one."));
-      body.append(itemRow(CUSTOM, "✍ Type my own words…", null));
+      if (!names.length) body.append(el("div", "empty", "No AI themes yet. Use Generate a theme below to make one."));
+      body.append(itemRow(CUSTOM, "Type my own words…" , null));
     }
     box.append(head, body);
     return box;
@@ -321,14 +395,14 @@
     inp.oninput = () => { moreCount = Math.max(10, Math.min(500, parseInt(inp.value, 10) || 100)); };
     lab.append(inp); p.append(lab);
     const row = el("div", "row");
-    const add = el("button", null, moreBusy ? "Working…" : "＋ Add to list"); add.disabled = moreBusy; add.onclick = () => generateMore(n, "add");
-    const rep = el("button", "secondary", "↻ Replace list"); rep.disabled = moreBusy; rep.onclick = () => generateMore(n, "replace");
+    const add = el("button", null, moreBusy ? "Working…" : "Add to list"); add.disabled = moreBusy; add.onclick = () => generateMore(n, "add");
+    const rep = el("button", "secondary", "Replace list"); rep.disabled = moreBusy; rep.onclick = () => generateMore(n, "replace");
     row.append(add, rep); p.append(row);
     p.append(el("p", "hint", "Replace deletes the old entries once the new ones have arrived."));
     const st = el("p", "status" + (moreMsg.cls ? " " + moreMsg.cls : ""), moreMsg.text); st.id = "moreStatus"; p.append(st);
-    if (moreMsg.needKey) { const b = el("button", "secondary", "Open ✨ Generate to add your key"); b.onclick = () => { phase = "gen"; show("gen"); }; p.append(b); }
+    if (moreMsg.needKey) { const b = el("button", "secondary", "Open Generate to add your key"); b.onclick = () => { phase = "gen"; show("gen"); }; p.append(b); }
     if (undoInfo && undoInfo.name === n && !moreBusy) {
-      const u = el("button", "secondary", "↩ Undo last change (back to " + undoInfo.list.length + " entries)");
+      const u = el("button", "secondary", "Undo last change (back to " + undoInfo.list.length + " entries)");
       u.onclick = () => { USER[n] = undoInfo.list; undoInfo = null; saveUser(); moreMsg = { text: "Restored.", cls: "ok" }; renderDrawers(); };
       p.append(u);
     }
@@ -364,7 +438,13 @@
 
   $("#custom").value = store.get("fg_custom", "");
   rebuildDecks();
-  if (!DRAW) { DRAW = { b: !curDeck || curDeck.startsWith("b:"), u: curDeck.startsWith("u:") || curDeck === CUSTOM }; renderDrawers(); }
+  if (!DRAW) DRAW = { b: !curDeck || curDeck.startsWith("b:"), u: curDeck.startsWith("u:") || curDeck === CUSTOM };
+  if (DRAW.b && DRAW.u) {
+    if (curDeck.startsWith("u:") || curDeck === CUSTOM) DRAW.b = false;
+    else DRAW.u = false;
+  }
+  store.set("fg_drawers", JSON.stringify(DRAW));
+  renderDrawers();
 
   $("#tiltDeg").value = store.get("fg_tilt", "40");
   $("#tiltVal").textContent = $("#tiltDeg").value + "°";
@@ -566,7 +646,7 @@
     } else {
       // 1. Put on forehead, sample neutral pose
       for (let i = 5; i >= 1; i--) {
-        $("#prepMsg").textContent = "Put the phone on your forehead 🤳";
+        $("#prepMsg").textContent = "Put the phone on your forehead";
         $("#prepSub").textContent = "Screen facing out, hold it upright… " + i;
         if (i === 1) { // average over last second
           let sum = 0, n = 0; const t0 = performance.now();
@@ -576,7 +656,7 @@
       }
       // 2. One-time calibration of tilt direction (iOS and Android differ in sign)
       if (!dir) {
-        $("#prepMsg").textContent = "Now tilt DOWN ⬇️";
+        $("#prepMsg").textContent = "Now tilt down";
         $("#prepSub").textContent = "Screen towards the floor, like you got it right";
         const t0 = performance.now();
         while (Math.abs(ang - neutral) < 30 && performance.now() - t0 < 12000) await nap(40);
@@ -623,7 +703,7 @@
     lock = true; armed = false; holdDir = 0;
     const w = $("#word").textContent;
     const g = $("#game");
-    if (kind === "ok") { correct.push(w); g.classList.add("ok"); $("#word").textContent = "✔ CORRECT!"; bell(); buzz(60); }
+    if (kind === "ok") { correct.push(w); g.classList.add("ok"); $("#word").textContent = "Correct!"; bell(); buzz(60); }
     else { passed.push(w); g.classList.add("pass"); $("#word").textContent = "PASS"; womp(); buzz([40,40,40]); }
     $("#score").textContent = correct.length;
     setTimeout(() => {
@@ -642,8 +722,8 @@
     beep(520, 0.4); buzz(400);
     $("#finalScore").textContent = correct.length;
     const ul = $("#resList"); ul.innerHTML = "";
-    correct.forEach(w => { const li = document.createElement("li"); li.className = "c"; li.textContent = "✔ " + w; ul.appendChild(li); });
-    passed.forEach(w => { const li = document.createElement("li"); li.className = "p"; li.textContent = "✘ " + w; ul.appendChild(li); });
+    correct.forEach(w => { const li = document.createElement("li"); li.className = "c"; li.textContent = "Correct · " + w; ul.appendChild(li); });
+    passed.forEach(w => { const li = document.createElement("li"); li.className = "p"; li.textContent = "Passed · " + w; ul.appendChild(li); });
     show("results");
     try { wakeLock && wakeLock.release(); wakeLock = null; } catch(e){}
     try { document.fullscreenElement && document.exitFullscreen(); } catch(e){}
@@ -892,7 +972,7 @@ Return JSON only, in the form {"entries": ["...", "..."]}.`;
   async function generateMore(name, mode){
     if (moreBusy || !USER[name]) return;
     const key = ($("#apiKey").value || store.get("fg_gemini_key", "")).trim();
-    if (!key) { moreMsg = { text: "Add your Gemini API key first (on the ✨ Generate screen).", cls: "err", needKey: true }; renderDrawers(); return; }
+    if (!key) { moreMsg = { text: "Add your Gemini API key first (on the Generate screen).", cls: "err", needKey: true }; renderDrawers(); return; }
     const old = USER[name].slice(), want = Math.max(10, Math.min(500, moreCount || 100));
     moreBusy = true; undoInfo = null; setMore("Starting…"); renderDrawers();
     const pg = progress(m => setMore(m));
@@ -932,8 +1012,8 @@ Return JSON only, in the form {"entries": ["...", "..."]}.`;
     rebuildDecks("u:" + name); store.set("fg_deck", "u:" + name);
     $("#genOut").classList.remove("on"); gstat(""); phase = "menu"; show("menu");
     $("#menuNote").className = "status " + (ok ? "ok" : "err");
-    $("#menuNote").textContent = ok ? '✔ Saved "' + name + '" (' + list.length + " entries) under My themes."
-      : '⚠ Could not save to this browser (private mode?). "' + name + '" is usable until you close the page; use Export to keep it.';
+    $("#menuNote").textContent = ok ? 'Saved "' + name + '" (' + list.length + " entries) under My themes."
+      : 'Could not save to this browser (private mode?). "' + name + '" is usable until you close the page; use Export to keep it.';
   };
 
   /* ---------- Buttons ---------- */
@@ -951,14 +1031,14 @@ Return JSON only, in the form {"entries": ["...", "..."]}.`;
   window.addEventListener("keydown", e => { if (e.key === "Escape" && phase !== "menu" && !(e.target && e.target.tagName === "INPUT")) goBack(); });
   $("#recalBtn").onclick = () => {
     dir = 0; try { localStorage.removeItem("fg_dir"); } catch(e){}
-    $("#recalBtn").textContent = "✔ Will recalibrate next game";
+    $("#recalBtn").textContent = "Will recalibrate next game";
   };
   // Live sensor status on the menu (helps diagnose browsers that block sensors)
   setInterval(() => {
     if (phase !== "settings") return;
     const ua = navigator.userAgent;
-    const note = !isSecureContext ? "⚠ Not HTTPS: motion sensors are blocked on this page."
-      : sensorOn ? "✔ Motion sensor working (tilt " + Math.round(ang) + "°)"
+    const note = !isSecureContext ? "Not HTTPS: motion sensors are blocked on this page."
+      : sensorOn ? "Motion sensor working (tilt " + Math.round(ang) + "°)"
       : "Sensor: no data yet (move your phone). " + (/Firefox/.test(ua) ? "Firefox: see tips below." : "");
     $("#sensorNote").textContent = note;
   }, 300);
@@ -969,5 +1049,159 @@ Return JSON only, in the form {"entries": ["...", "..."]}.`;
   }
 })();
 </script>
+
+<script>
+/* A tiny, odd little world behind the game: slow contour currents + hand-drawn oddities. */
+(() => {
+  const canvas = document.getElementById("ambient");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d", { alpha: true });
+  if (!ctx) return;
+
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  let w = 0, h = 0, dpr = 1, raf = 0, last = 0, time = 0;
+  const palette = ["#c47b62", "#87977a", "#c1a36b", "#a99a83"];
+  const oddities = [
+    {x:.13,y:.19,s:1.0,k:0}, {x:.83,y:.16,s:.8,k:1},
+    {x:.91,y:.69,s:1.05,k:2}, {x:.18,y:.82,s:.78,k:3},
+    {x:.54,y:.09,s:.62,k:1}, {x:.69,y:.88,s:.9,k:0},
+    {x:.045,y:.51,s:.7,k:2}, {x:.96,y:.39,s:.68,k:3}
+  ];
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 1.7);
+    w = window.innerWidth; h = window.innerHeight;
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+    canvas.style.width = w + "px";
+    canvas.style.height = h + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw(0);
+  }
+
+  function contour(cx, cy, base, seed, t) {
+    ctx.beginPath();
+    const steps = 150;
+    for (let i = 0; i <= steps; i++) {
+      const a = i / steps * Math.PI * 2;
+      const wobble =
+        Math.sin(a * 3 + seed + t * .16) * 8 +
+        Math.sin(a * 5 - seed * 1.7 + t * .11) * 4.5 +
+        Math.cos(a * 2 + seed * .7 - t * .09) * 5;
+      const r = base + wobble;
+      const x = cx + Math.cos(a) * r * 1.18;
+      const y = cy + Math.sin(a) * r * .78;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.stroke();
+  }
+
+  function star(x, y, s) {
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) {
+      const a = i * Math.PI / 4;
+      const r = i % 2 ? s * .28 : s;
+      const px = x + Math.cos(a) * r, py = y + Math.sin(a) * r;
+      if (!i) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(x + s * 1.35, y - s * .9, s * .16, 0, Math.PI * 2); ctx.fill();
+  }
+
+  function eye(x, y, s) {
+    ctx.beginPath();
+    ctx.moveTo(x - s, y);
+    ctx.quadraticCurveTo(x, y - s * .78, x + s, y);
+    ctx.quadraticCurveTo(x, y + s * .78, x - s, y);
+    ctx.stroke();
+    ctx.beginPath(); ctx.arc(x, y, s * .22, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + s * 1.5, y - s * .85, s * .12, 0, Math.PI * 2); ctx.fill();
+  }
+
+  function spiral(x, y, s, t) {
+    ctx.beginPath();
+    for (let i = 0; i <= 65; i++) {
+      const a = i / 65 * Math.PI * 3.2 + t * .05;
+      const r = s * (.08 + i / 65 * .75);
+      const px = x + Math.cos(a) * r, py = y + Math.sin(a) * r;
+      if (!i) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+  }
+
+  function worm(x, y, s, t) {
+    ctx.beginPath();
+    ctx.moveTo(x - s, y);
+    ctx.bezierCurveTo(x - s * .45, y - s * (1 + Math.sin(t * .3) * .12),
+                      x + s * .35, y + s * .9, x + s, y - s * .1);
+    ctx.stroke();
+    ctx.beginPath(); ctx.arc(x + s * .48, y - s * .2, s * .07, 0, Math.PI * 2); ctx.fill();
+  }
+
+  function draw(t) {
+    ctx.clearRect(0, 0, w, h);
+    // Broad, faint contour islands. Their outlines gently breathe rather than scroll.
+    const scale = Math.min(w, h);
+    const islands = [
+      {x:.02,y:.08,r:scale*.22,seed:1.1},
+      {x:.98,y:.27,r:scale*.19,seed:2.8},
+      {x:.77,y:1.02,r:scale*.23,seed:4.2},
+      {x:.18,y:.91,r:scale*.16,seed:5.4}
+    ];
+    islands.forEach((p, n) => {
+      ctx.save();
+      ctx.translate(p.x * w, p.y * h);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = palette[n] + "42";
+      for (let j = 0; j < 5; j++) contour(0, 0, p.r * (.48 + j * .16), p.seed + j * .63, t);
+      ctx.restore();
+    });
+
+    // Tiny marginalia: part star chart, part doodle left in a notebook.
+    oddities.forEach((o, i) => {
+      const drift = Math.sin(t * .12 + i * 1.8) * 5;
+      const x = o.x * w + drift;
+      const y = o.y * h + Math.cos(t * .1 + i) * 4;
+      const s = Math.max(7, Math.min(13, scale * .014)) * o.s;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(Math.sin(t * .08 + i) * .12);
+      ctx.lineWidth = 1.25;
+      ctx.strokeStyle = palette[o.k] + "99";
+      ctx.fillStyle = palette[o.k] + "99";
+      if (o.k === 0) star(0, 0, s);
+      else if (o.k === 1) eye(0, 0, s);
+      else if (o.k === 2) spiral(0, 0, s, t + i);
+      else worm(0, 0, s * 1.25, t + i);
+      ctx.restore();
+    });
+
+    // A few almost invisible specks, like dust caught in the light.
+    for (let i = 0; i < 28; i++) {
+      const x = ((i * 137.51) % 997) / 997 * w;
+      const y = ((i * 271.83) % 991) / 991 * h;
+      const pulse = .45 + .35 * Math.sin(t * .25 + i * 2);
+      ctx.fillStyle = "#9c927f" + Math.round(pulse * 70).toString(16).padStart(2, "0");
+      ctx.beginPath(); ctx.arc(x, y, i % 5 === 0 ? 1.35 : .75, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  function frame(now) {
+    if (now - last > 40) { time += .04; draw(time); last = now; }
+    raf = requestAnimationFrame(frame);
+  }
+  function start() {
+    cancelAnimationFrame(raf);
+    if (reduceMotion.matches) { draw(0); return; }
+    raf = requestAnimationFrame(frame);
+  }
+  window.addEventListener("resize", resize, {passive:true});
+  if (reduceMotion.addEventListener) reduceMotion.addEventListener("change", start);
+  resize();
+  start();
+})();
+</script>
+
 </body>
 </html>
