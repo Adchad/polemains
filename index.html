@@ -82,6 +82,10 @@
     <label>Round length (seconds)
       <input type="number" id="secs" value="60" min="15" max="300" step="5">
     </label>
+    <label>Tilt needed to answer: <b id="tiltVal">40°</b>
+      <input type="range" id="tiltDeg" min="25" max="65" step="5" value="40">
+      <span class="small" style="margin:0;font-size:.8rem">Lower = more sensitive. Raise it if it answers by accident.</span>
+    </label>
     <label class="chk"><input type="checkbox" id="touchOn" checked> Tap the screen to answer (bottom = correct, top = pass)</label>
     <button id="startBtn">Start</button>
     <button class="secondary" id="recalBtn">Recalibrate tilt direction next game</button>
@@ -224,6 +228,9 @@
   $("#custom").value = store.get("fg_custom", "");
   rebuildDecks();
 
+  $("#tiltDeg").value = store.get("fg_tilt", "40");
+  $("#tiltVal").textContent = $("#tiltDeg").value + "°";
+  $("#tiltDeg").oninput = e => { $("#tiltVal").textContent = e.target.value + "°"; store.set("fg_tilt", e.target.value); };
   $("#touchOn").checked = store.get("fg_touch", "1") !== "0";
   $("#touchOn").onchange = e => store.set("fg_touch", e.target.checked ? "1" : "0");
 
@@ -247,24 +254,40 @@
   };
 
   /* ---------- Sensor ---------- */
-  let z = 0;                 // latest gravity along screen normal, in g (≈ -1..1)
+  // Tilt of the screen from vertical, in degrees (0 = upright on the forehead, +/-90 = facing floor/ceiling).
+  // It comes from the direction of gravity (accelerometer), smoothed, so a shake or bump can't fake a tilt.
+  // The sign differs between iOS and Android; "dir" (calibrated once) fixes that.
+  let ang = 0, angInit = false, lastT = 0, badSince = 0;
   let sensorOn = false;
-  let dir = 0;               // +1 or -1: sign of z-change when tilting DOWN. 0 = unknown.
+  let dir = 0;               // +1 or -1: sign of the angle change when tilting DOWN. 0 = unknown.
   try { dir = parseInt(localStorage.getItem("fg_dir") || "0", 10) || 0; } catch(e){}
+  const TAU = 80;            // smoothing time constant in ms (higher = calmer but slower)
+
+  function feed(deg, t){
+    if (!angInit) { ang = deg; angInit = true; }
+    else ang += (deg - ang) * (1 - Math.exp(-Math.max(1, Math.min(200, t - lastT)) / TAU));
+    lastT = t; sensorOn = true;
+  }
 
   let motionSeen = false, sensorWhy = "";
   function onMotion(e){
     const a = e.accelerationIncludingGravity;
-    if (!a || a.z == null) return;
-    motionSeen = true; sensorOn = true;
-    z = Math.max(-1.2, Math.min(1.2, a.z / 9.81));
+    if (!a || a.x == null || a.y == null || a.z == null) return;
+    motionSeen = true;
+    const t = performance.now(), g = Math.hypot(a.x, a.y, a.z);
+    if (g < 1) return;
+    // Normalising by |g| removes most of the effect of linear acceleration. While the phone is being
+    // shaken hard the reading is unreliable, so skip it (but give up skipping after 1.5 s in case the
+    // device reports gravity in odd units).
+    if (Math.abs(g - 9.81) > 5) { if (!badSince) badSince = t; if (t - badSince < 1500) { sensorOn = true; return; } }
+    else badSince = 0;
+    feed(Math.asin(Math.max(-1, Math.min(1, a.z / g))) * 180 / Math.PI, t);
   }
-  // Fallback: derive gravity along the screen normal from orientation angles
+  // Fallback if no accelerometer data: derive the same angle from the fused orientation angles
   function onOrient(e){
     if (motionSeen || e.beta == null || e.gamma == null) return;
-    const r = Math.PI / 180;
-    z = Math.cos(e.beta * r) * Math.cos(e.gamma * r);
-    sensorOn = true;
+    const r = Math.PI / 180, zc = Math.cos(e.beta * r) * Math.cos(e.gamma * r);
+    feed(Math.asin(Math.max(-1, Math.min(1, zc))) * 180 / Math.PI, performance.now());
   }
   let listening = false;
   function listen(){
@@ -277,16 +300,19 @@
   async function enableSensor(permP){
     sensorWhy = "";
     if (!window.isSecureContext) { sensorWhy = "This page isn't served over HTTPS (open the https:// GitHub Pages link, not a file)."; return false; }
+    // A refused/failed permission prompt is not fatal: some browsers expose the prompt API but still
+    // deliver motion data, so we listen anyway and only complain if nothing arrives.
+    let denied = "";
     try {
       if (permP) {
         const r = await permP;
-        if (r !== "granted") { sensorWhy = "Motion access was denied. On iPhone: fully close Safari, reopen the page and tap Allow (or Settings → Safari → Motion & Orientation Access)."; return false; }
+        if (r !== "granted") denied = "Motion access was denied. On iPhone: fully close Safari, reopen the page and tap Allow (or Settings → Safari → Motion & Orientation Access).";
       }
-    } catch(e){ sensorWhy = "Motion permission failed: " + (e && e.message || e); return false; }
+    } catch(e){ denied = "Motion permission failed: " + (e && e.message || e); }
     listen();
     const t0 = performance.now();
-    while (!sensorOn && performance.now() - t0 < 3000) await sleep(100);
-    if (!sensorOn) sensorWhy = "No motion data received. On Android Chrome check Site settings → Motion sensors is allowed (and Battery saver is off); in-app browsers often block sensors, so use Chrome/Safari directly.";
+    while (!sensorOn && performance.now() - t0 < (denied ? 1500 : 3000)) await sleep(100);
+    if (!sensorOn) sensorWhy = denied || "No motion data received. On Android Chrome check Site settings → Motion sensors is allowed (and Battery saver is off); in-app browsers often block sensors, so use Chrome/Safari directly.";
     return sensorOn;
   }
 
@@ -417,7 +443,7 @@
         $("#prepSub").textContent = "Screen facing out, hold it upright… " + i;
         if (i === 1) { // average over last second
           let sum = 0, n = 0; const t0 = performance.now();
-          while (performance.now() - t0 < 1000) { sum += z; n++; await nap(30); }
+          while (performance.now() - t0 < 1000) { sum += ang; n++; await nap(30); }
           neutral = sum / n;
         } else await nap(1000);
       }
@@ -426,21 +452,19 @@
         $("#prepMsg").textContent = "Now tilt DOWN ⬇️";
         $("#prepSub").textContent = "Screen towards the floor, like you got it right";
         const t0 = performance.now();
-        while (Math.abs(z - neutral) < 0.45 && performance.now() - t0 < 12000) await nap(40);
-        dir = (z - neutral) >= 0 ? 1 : -1;
+        while (Math.abs(ang - neutral) < 30 && performance.now() - t0 < 12000) await nap(40);
+        dir = (ang - neutral) >= 0 ? 1 : -1;
         try { localStorage.setItem("fg_dir", String(dir)); } catch(e){}
         buzz(80); beep(660);
         $("#prepMsg").textContent = "Good! Back up ⬆️";
         $("#prepSub").textContent = "";
         const t1 = performance.now();
-        while (Math.abs(z - neutral) > 0.25 && performance.now() - t1 < 8000) await nap(40);
+        while (Math.abs(ang - neutral) > 15 && performance.now() - t1 < 8000) await nap(40);
         await nap(500);
       }
     }
 
-    // 3. Countdown
-    for (let i = 3; i >= 1; i--) { $("#prepMsg").textContent = i; $("#prepSub").textContent = "Get ready!"; beep(440); await nap(850); }
-    beginRound();
+    beginRound();      // straight into the round: no 3-2-1
   }
 
   function beginRound(){
@@ -454,9 +478,10 @@
     show("game"); beep(880, 0.25); buzz(150);
   }
 
+  const FLASH_MS = 450;       // how long the full-screen CORRECT / PASS flash lasts
   function answer(kind){
     if (phase !== "play" || lock) return;
-    lock = true; armed = false;
+    lock = true; armed = false; holdDir = 0;
     const w = $("#word").textContent;
     const g = $("#game");
     if (kind === "ok") { correct.push(w); g.classList.add("ok"); $("#word").textContent = "✔ CORRECT!"; bell(); buzz(60); }
@@ -468,7 +493,7 @@
       lock = false;
       // Must return to neutral before next answer registers
       armed = false;
-    }, 750);
+    }, FLASH_MS);
   }
 
   function endRound(){
@@ -484,20 +509,28 @@
   }
 
   /* ---------- Main loop ---------- */
-  const TRIGGER = 0.55;   // ≈ 33°+ of extra tilt from neutral
-  const REARM   = 0.28;   // must come back near neutral before next trigger
+  const HOLD_MS = 150;                      // the tilt must stay past the threshold this long
+  const tiltDeg = () => parseInt($("#tiltDeg").value, 10) || 40;
+  const rearmDeg = () => Math.max(12, tiltDeg() * 0.5);   // come back this close to upright before the next answer
+  let holdDir = 0, holdSince = 0;
   setInterval(() => {
     if (phase !== "play") return;
-    const left = Math.max(0, endAt - performance.now());
+    const now = performance.now(), left = Math.max(0, endAt - now);
     $("#timer").textContent = Math.ceil(left / 1000);
     if (left <= 0) { endRound(); return; }
-    if (touchMode || lock) return;
-    const d = (z - neutral) * dir;           // + = tilted down, − = tilted up
-    if (armed) {
-      if (d > TRIGGER) answer("ok");
-      else if (d < -TRIGGER) answer("pass");
-    } else if (Math.abs(d) < REARM) armed = true;
-  }, 40);
+    if (touchMode || lock) { holdDir = 0; return; }
+    const d = (ang - neutral) * dir;         // + = tilted down, − = tilted up (degrees)
+    if (!armed) {
+      holdDir = 0;
+      if (Math.abs(d) < rearmDeg()) armed = true;
+      return;
+    }
+    // slowly follow small drifts of the resting pose (head posture changes over a round)
+    if (Math.abs(d) < rearmDeg() * 0.6) neutral += (ang - neutral) * 0.01;
+    const th = tiltDeg(), want = d > th ? 1 : d < -th ? -1 : 0;
+    if (want !== holdDir) { holdDir = want; holdSince = now; }
+    else if (want && now - holdSince >= HOLD_MS) { holdDir = 0; answer(want > 0 ? "ok" : "pass"); }
+  }, 30);
 
   /* ---------- Touch / keyboard fallback ---------- */
   $("#game").addEventListener("pointerdown", e => {
@@ -733,7 +766,7 @@ Return JSON only, in the form {"entries": ["...", "..."]}.`;
     if (phase !== "menu") return;
     const ua = navigator.userAgent;
     const note = !isSecureContext ? "⚠ Not HTTPS: motion sensors are blocked on this page."
-      : sensorOn ? "✔ Motion sensor working (reading " + z.toFixed(2) + ")"
+      : sensorOn ? "✔ Motion sensor working (tilt " + Math.round(ang) + "°)"
       : "Sensor: no data yet (move your phone). " + (/Firefox/.test(ua) ? "Firefox: see tips below." : "");
     $("#sensorNote").textContent = note;
   }, 300);
