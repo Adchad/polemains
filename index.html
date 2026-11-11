@@ -262,11 +262,17 @@
     font-size:clamp(3rem,16vw,4.2rem);line-height:1.02;letter-spacing:.01em;margin:6px 0 14px;
     display:flex;flex-wrap:wrap;justify-content:center;gap:0 .32em;
   }
-  #title .tw{display:inline-flex}
+  #title .tw{display:inline-flex;padding:2px 4px}
+  #title.phys{display:block;position:relative;width:100%}
+  #title.phys .tw{position:absolute;left:0;top:0;touch-action:none;cursor:grab;will-change:transform}
+  #title.phys .tw.drag{cursor:grabbing;z-index:3}
   #title .tl{display:inline-block;transform:rotate(var(--r));text-shadow:2px 3px 0 rgba(48,51,46,.14);animation:wiggle 3.6s ease-in-out var(--d) infinite}
   @keyframes wiggle{0%,100%{transform:rotate(var(--r)) translateY(0)}50%{transform:rotate(calc(var(--r) * -1)) translateY(-3px)}}
 
   /* ---------- Whimsical pastel drawers ---------- */
+  #pickLbl{margin:2px 0 -4px;text-align:left;padding-left:6px;font-family:"Fredoka","Segoe UI",system-ui,sans-serif;font-weight:500;font-size:.95rem;color:var(--muted)}
+  /* tapping a drawer header must not recolour it */
+  .dHead,.dHead:hover:not(:disabled),.dHead:active,.dHead:focus{background:transparent !important;color:var(--ink)}
   .drawers{gap:16px}
   .drawer{border:2px solid var(--ink);overflow:hidden}
   .drawer.dB{background:#e9eee2;border-radius:26px 14px 28px 14px;transform:rotate(-.5deg);box-shadow:4px 5px 0 var(--sage)}
@@ -304,6 +310,7 @@
 <section id="menu" class="screen scroll active">
   <div class="card">
     <h1 id="title" aria-label="Le gros front"></h1>
+    <p id="pickLbl">Pick a theme:</p>
     <div id="drawers" class="drawers"></div>
     <p class="status" id="menuNote"></p>
     <label id="customWrap" style="display:none">Your words (comma or new line separated)
@@ -476,6 +483,17 @@
     syncDeck(); renderDrawers();
   }
   function syncDeck(){ $("#customWrap").style.display = curDeck === CUSTOM ? "flex" : "none"; }
+  let drawTimer = 0;
+  function deselect(redraw = true){
+    curDeck = ""; moreFor = ""; confirmClear = ""; syncDeck(); note("");
+    if (redraw) renderDrawers();
+  }
+  // tapping empty space (not a control) clears the selection
+  document.addEventListener("click", e => {
+    if (phase !== "menu" || !curDeck) return;
+    if (e.target.closest("#drawers,button,input,textarea,label,a,select,summary,#customWrap")) return;
+    deselect();
+  }, true);       // capture phase: the tapped element is still in the DOM when we test it
   function pickItem(v){ note(""); if (curDeck !== v) { moreFor = ""; confirmClear = ""; } pickDeck(v); store.set("fg_deck", v); }
 
   function renderDrawers(){
@@ -504,7 +522,7 @@
     const row = el("div", "item" + (curDeck === v ? " active" : ""));
     const main = el("div", "iMain");
     main.append(el("span", "dot"), el("span", "iName", label));
-    if (count != null) main.append(el("span", "iCount", String(count)));
+    if (count != null && curDeck === v) main.append(el("span", "iCount", String(count)));
     main.onclick = () => pickItem(v);
     row.append(main); if (acts) row.append(acts);
     return row;
@@ -531,10 +549,21 @@
         d.classList.toggle("open", o);
         d.querySelector(".dHead").setAttribute("aria-expanded", String(o));
       });
+      // a drawer that closes drops the selection that lived inside it
+      const owner = curDeck.startsWith("b:") ? "b" : (curDeck.startsWith("u:") || curDeck === CUSTOM) ? "u" : "";
+      if (owner && !DRAW[owner]) {
+        deselect(false);
+        document.querySelectorAll("#drawers .item.active").forEach(r => {
+          r.classList.remove("active");
+          r.querySelectorAll(".iActs,.iCount").forEach(x => x.remove());
+          if (r.nextElementSibling && r.nextElementSibling.classList.contains("more")) r.nextElementSibling.remove();
+        });
+        clearTimeout(drawTimer); drawTimer = setTimeout(renderDrawers, 800);   // refresh labels after the slide finishes
+      } else { clearTimeout(drawTimer); }
     };
     const body = el("div", "dBody" + (!isB && moreFor && USER[moreFor] ? " tall" : "")); body.dataset.d = id;
     if (isB) {
-      names.forEach(n => body.append(itemRow("b:" + n, n, DECKS[n].length)));
+      names.forEach(n => body.append(itemRow("b:" + n, n, null)));
     } else {
       names.forEach(n => {
         const acts = el("div", "iActs");
@@ -610,7 +639,85 @@
       });
       t.append(w);
     });
+    titlePhysics(t);
   })();
+
+  /* Useless but fun: the title words can be thrown around inside an invisible box (inertia + collisions) */
+  function titlePhysics(box){
+    const words = [...box.querySelectorAll(".tw")].map(el => ({ el, x: 0, y: 0, w: 0, h: 0, m: 1, vx: 0, vy: 0, drag: false, tx: 0, ty: 0 }));
+    let W = 0, H = 0, running = false, last = 0;
+    // Weighty feel: low bounciness, heavy friction, and a soft spring (not a rigid grip) between finger and word,
+    // so a word lags behind the finger, has to be dragged against other words, and keeps its momentum when let go.
+    const REST = 0.18, FRICTION = 3.2, SPRING = 55, MAXV = 1800;
+    const paint = () => words.forEach(o => { o.el.style.transform = "translate(" + o.x.toFixed(1) + "px," + o.y.toFixed(1) + "px)"; });
+
+    function layout(){
+      box.classList.remove("phys"); box.style.height = "";
+      words.forEach(o => { o.el.style.transform = ""; });
+      const br = box.getBoundingClientRect();
+      if (!br.width) { setTimeout(layout, 400); return; }        // menu not visible yet
+      words.forEach(o => { const r = o.el.getBoundingClientRect(); o.x = r.left - br.left; o.y = r.top - br.top + 20; o.w = r.width; o.h = r.height; o.m = Math.max(.6, o.w * o.h / 6000); o.vx = o.vy = 0; });
+      W = br.width; H = Math.ceil(br.height) + 40;
+      box.classList.add("phys"); box.style.height = H + "px"; paint();
+    }
+
+    function collide(a, b){
+      const ox = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+      const oy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+      if (ox <= 0 || oy <= 0) return;
+      const horiz = ox < oy, k = horiz ? "x" : "y", v = horiz ? "vx" : "vy", sz = horiz ? "w" : "h", pen = horiz ? ox : oy;
+      const n = (b[k] + b[sz] / 2 >= a[k] + a[sz] / 2) ? 1 : -1;       // b sits on this side of a
+      const ia = 1 / a.m, ib = 1 / b.m, tot = ia + ib;
+      a[k] -= n * pen * ia / tot; b[k] += n * pen * ib / tot;            // the lighter word gets shoved further
+      const vrel = b[v] - a[v];
+      if (vrel * n < 0) { const j = -(1 + REST) * vrel / tot; a[v] -= j * ia; b[v] += j * ib; }
+    }
+
+    function step(now){
+      const dt = Math.min(.025, (now - last) / 1000 || .016); last = now;
+      let busy = false;
+      words.forEach(o => {
+        if (o.drag) {                                     // soft critically-damped spring towards the finger, divided by mass
+          const c = 2 * Math.sqrt(SPRING);
+          o.vx += ((SPRING * (o.tx - o.x) - c * o.vx) / o.m) * dt;
+          o.vy += ((SPRING * (o.ty - o.y) - c * o.vy) / o.m) * dt;
+          busy = true;
+        }
+        const f = Math.exp(-FRICTION * dt); o.vx *= f; o.vy *= f;
+        const sp = Math.hypot(o.vx, o.vy); if (sp > MAXV) { o.vx *= MAXV / sp; o.vy *= MAXV / sp; }
+        o.x += o.vx * dt; o.y += o.vy * dt;
+        if (o.x < 0) { o.x = 0; o.vx = Math.abs(o.vx) * REST; }
+        if (o.x > W - o.w) { o.x = W - o.w; o.vx = -Math.abs(o.vx) * REST; }
+        if (o.y < 0) { o.y = 0; o.vy = Math.abs(o.vy) * REST; }
+        if (o.y > H - o.h) { o.y = H - o.h; o.vy = -Math.abs(o.vy) * REST; }
+        if (!o.drag) { if (Math.hypot(o.vx, o.vy) > 5) busy = true; else o.vx = o.vy = 0; }
+      });
+      for (let it = 0; it < 3; it++) for (let i = 0; i < words.length; i++) for (let j = i + 1; j < words.length; j++) collide(words[i], words[j]);
+      words.forEach(o => { o.x = Math.max(0, Math.min(W - o.w, o.x)); o.y = Math.max(0, Math.min(H - o.h, o.y)); });
+      paint();
+      if (busy) requestAnimationFrame(step); else running = false;
+    }
+    const wake = () => { if (!running) { running = true; last = performance.now(); requestAnimationFrame(step); } };
+
+    words.forEach(o => {
+      let ox = 0, oy = 0;
+      const aim = e => { const br = box.getBoundingClientRect(); o.tx = e.clientX - br.left - ox; o.ty = e.clientY - br.top - oy; };
+      o.el.addEventListener("pointerdown", e => {
+        const br = box.getBoundingClientRect();
+        o.drag = true; ox = e.clientX - br.left - o.x; oy = e.clientY - br.top - o.y; aim(e);
+        o.el.classList.add("drag"); try { o.el.setPointerCapture(e.pointerId); } catch(_){}
+        wake(); e.preventDefault();
+      });
+      o.el.addEventListener("pointermove", e => { if (o.drag) aim(e); });
+      const up = () => { if (!o.drag) return; o.drag = false; o.el.classList.remove("drag"); wake(); };
+      o.el.addEventListener("pointerup", up); o.el.addEventListener("pointercancel", up);
+    });
+
+    layout();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(layout);
+    let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(layout, 150); });
+    box._physLayout = layout;
+  }
   $("#custom").value = store.get("fg_custom", "");
   rebuildDecks();
   if (!DRAW) DRAW = { b: !curDeck || curDeck.startsWith("b:"), u: curDeck.startsWith("u:") || curDeck === CUSTOM };
