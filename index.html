@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#f4f0e8">
 <title>Forehead Game</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -205,7 +208,51 @@
   transition:transform .4s ease;
   }
   #settingsBtn:hover svg{ transform:rotate(45deg); }
-  #startBtn{ font-size:2rem; padding:20px; }</style>
+
+  /* ---------- Floating lettering instead of big buttons ---------- */
+  .floatWord,.floatWord:hover:not(:disabled){background:none;border:0;box-shadow:none}
+  #startBtn{
+    align-self:center;margin:22px 0 10px;padding:10px 14px;
+    font-family:"Press Start 2P","Courier New",monospace;
+    font-weight:400;font-size:clamp(2.2rem,12vw,3.2rem);line-height:1;letter-spacing:.04em;
+    color:var(--ochre);
+    text-shadow:4px 4px 0 var(--terracotta-dark);
+    animation:bob 1.2s steps(2,end) infinite;
+    cursor:pointer;
+  }
+  #startBtn:hover:not(:disabled){color:#d3b57a}
+  #startBtn:active{transform:translate(3px,3px);text-shadow:1px 1px 0 var(--terracotta-dark)}
+  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+  .genWrap{padding:10px 14px 14px;display:flex;justify-content:center}
+  .aiLink,.aiLink:hover:not(:disabled){background:none;border:0;box-shadow:none}
+  .aiLink{
+    display:inline-flex;align-items:center;gap:7px;padding:4px 6px;
+    font-size:.95rem;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;
+  }
+  .aiLink svg{width:1.1rem;height:1.1rem;fill:var(--ochre);flex:none;transition:transform .5s ease}
+  .aiLink:hover:not(:disabled){color:var(--ink)}
+  .aiLink:hover svg{transform:rotate(25deg) scale(1.15)}
+
+  /* ---------- Colour-cut action strips on the selected entry ---------- */
+  .item.active{padding-right:0;align-items:stretch}
+  .item.active .iMain{padding-right:8px}
+  .iActs{gap:3px;align-items:stretch}
+  .iActs .seg{
+    width:46px;min-width:46px;padding:0;margin:0;border:0;border-radius:0;
+    display:grid;place-items:center;color:#fffaf4;font-size:0;
+    animation:segIn .22s ease both;
+  }
+  .iActs .seg:nth-child(2){animation-delay:.05s}.iActs .seg:nth-child(3){animation-delay:.1s}
+  @keyframes segIn{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+  .seg svg{width:22px;height:22px;fill:currentColor;pointer-events:none}
+  .seg.s-export{background:var(--sage)}.seg.s-export:hover:not(:disabled){background:#76876a}
+  .seg.s-more{background:var(--ochre);color:#4a3d1f}.seg.s-more:hover:not(:disabled){background:#b09258}
+  .seg.s-more.on{background:#8f7640;color:#fffaf4}
+  .seg.s-clear{background:var(--terracotta)}.seg.s-clear:hover:not(:disabled){background:var(--terracotta-dark)}
+  .seg.s-clear.warn{background:#8e4a39;width:76px;font-size:.8rem;font-weight:700;display:flex;gap:4px;align-items:center;justify-content:center}
+  .seg.s-clear.warn svg{width:18px;height:18px}
+  @media (prefers-reduced-motion: reduce){#startBtn,.iActs .seg{animation:none}}
+</style>
   
 </head>
 <body>
@@ -220,7 +267,7 @@
     <label id="customWrap" style="display:none">Your words (comma or new line separated)
       <textarea id="custom" placeholder="pizza, Eiffel Tower, karaoke..."></textarea>
     </label>
-    <button id="startBtn">Play !</button>
+    <button id="startBtn" class="floatWord">Play!</button>
   </div>
 </section>
 
@@ -403,7 +450,7 @@
     syncDeck(); renderDrawers();
   }
   function syncDeck(){ $("#customWrap").style.display = curDeck === CUSTOM ? "flex" : "none"; }
-  function pickItem(v){ note(""); pickDeck(v); store.set("fg_deck", v); }
+  function pickItem(v){ note(""); if (curDeck !== v) { moreFor = ""; confirmClear = ""; } pickDeck(v); store.set("fg_deck", v); }
 
   function renderDrawers(){
     const host = $("#drawers"), keep = {};
@@ -412,8 +459,17 @@
     host.append(buildDrawer("b"), buildDrawer("u"));
     host.querySelectorAll(".dBody").forEach(b => { if (keep[b.dataset.d]) b.scrollTop = keep[b.dataset.d]; });
   }
-  function mini(txt, label, fn, cls){
-    const b = el("button", "mini" + (cls ? " " + cls : ""), txt);
+  // Material Design style glyphs (same family as Nerd Fonts' nf-md set), drawn inline so they work offline
+  const ICON = {
+    export: "M5 20h14v-2H5v2zM12 2 6.5 7.5l1.4 1.4L11 5.8V16h2V5.8l3.1 3.1 1.4-1.4L12 2z",
+    sparkle: "M19 1l-1.26 2.75L15 5l2.74 1.26L19 9l1.25-2.74L23 5l-2.75-1.25M9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12l-5.5-2.5M19 15l-1.26 2.74L15 19l2.74 1.25L19 23l1.25-2.75L23 19l-2.75-1.26",
+    trash: "M9 3v1H4v2h1v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6h1V4h-5V3H9m0 5h2v9H9V8m4 0h2v9h-2V8z",
+    check: "M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"
+  };
+  const icon = d => { const s = document.createElementNS("http://www.w3.org/2000/svg", "svg"); s.setAttribute("viewBox", "0 0 24 24"); s.setAttribute("aria-hidden", "true"); const p = document.createElementNS("http://www.w3.org/2000/svg", "path"); p.setAttribute("d", d); s.append(p); return s; };
+  function mini(ic, label, fn, cls, txt){
+    const b = el("button", "seg " + (cls || ""));
+    b.append(icon(ic)); if (txt) b.append(document.createTextNode(txt));
     b.setAttribute("aria-label", label); b.title = label;
     b.onclick = e => { e.stopPropagation(); fn(); };
     return b;
@@ -452,17 +508,21 @@
       names.forEach(n => {
         const acts = el("div", "iActs");
         acts.append(
-          mini("Export", "Export", () => exportTheme(n)),
-          mini("More", "Generate more entries with AI", () => { moreFor = moreFor === n ? "" : n; moreMsg = { text: "", cls: "" }; renderDrawers(); }, moreFor === n ? "on" : ""),
-          mini(confirmClear === n ? "Sure?" : "Clear", "Clear this theme", () => clearTheme(n), confirmClear === n ? "warn" : ""));
-        body.append(itemRow("u:" + n, n, USER[n].length, acts));
-        if (moreFor === n) body.append(morePanel(n));
+          mini(ICON.export, "Export as a .js list file", () => exportTheme(n), "s-export"),
+          mini(ICON.sparkle, "Generate more entries with AI", () => { moreFor = moreFor === n ? "" : n; moreMsg = { text: "", cls: "" }; renderDrawers(); }, "s-more" + (moreFor === n ? " on" : "")),
+          confirmClear === n
+            ? mini(ICON.check, "Tap again to clear this theme", () => clearTheme(n), "s-clear warn", "Sure?")
+            : mini(ICON.trash, "Clear this theme", () => clearTheme(n), "s-clear"));
+        const sel = curDeck === "u:" + n;               // action strips only exist on the selected entry
+        body.append(itemRow("u:" + n, n, USER[n].length, sel ? acts : null));
+        if (sel && moreFor === n) body.append(morePanel(n));
       });
       if (!names.length) body.append(el("div", "empty", "No AI themes yet. Use Generate a theme below to make one."));
       body.append(itemRow(CUSTOM, "Type my own words…" , null));
       // Generate button integrated into the Custom drawer
-      const genRow = el("div", "more");
-      const genBtn = el("button", null, "Generate a theme with AI");
+      const genRow = el("div", "genWrap");
+      const genBtn = el("button", "aiLink");
+      genBtn.append(icon(ICON.sparkle), document.createTextNode("Generate with AI"));
       genBtn.onclick = () => { phase = "gen"; show("gen"); };
       genRow.append(genBtn);
       body.append(genRow);
