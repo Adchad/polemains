@@ -148,8 +148,16 @@
   #game{background:transparent;color:var(--ink)}
   #game.ok{background:#87977a;color:#fffaf4}
   #game.pass{background:#c47b62;color:#fffaf4}
-  .backBtn,.finishBtn{background:#e8e2d7;color:var(--ink);border:1px solid var(--line);border-radius:8px}
-  .backBtn:hover:not(:disabled),.finishBtn:hover:not(:disabled){background:#ded7ca}
+  .backBtn,.finishBtn,.backBtn:hover:not(:disabled),.finishBtn:hover:not(:disabled){
+    background:none;border:0;box-shadow:none;color:inherit;
+    font-family:"Fredoka","Segoe UI",system-ui,sans-serif;font-weight:600;letter-spacing:.01em;
+  }
+  .backBtn{padding:8px 10px;font-size:1.1rem;opacity:.75;transition:opacity .15s,transform .2s cubic-bezier(.34,1.56,.64,1)}
+  .finishBtn{padding:8px 10px;font-size:1.1rem;opacity:.75;transition:opacity .15s,transform .2s cubic-bezier(.34,1.56,.64,1)}
+  .backBtn:hover:not(:disabled),.finishBtn:hover:not(:disabled){opacity:1}
+  .backBtn:hover:not(:disabled){transform:translateX(-3px)}
+  .finishBtn:hover:not(:disabled){transform:translateX(3px)}
+  .screen:not(#game) .backBtn{color:var(--ink)}
   ul.res li{background:var(--surface-alt);border-radius:6px}
   ul.res li.c{border-left-color:var(--sage)}
   ul.res li.p{border-left-color:var(--terracotta)}
@@ -184,35 +192,30 @@
   }
 
   /* ---------- Settings cogwheel button (bottom right) ---------- */
+  #settingsBtn,#settingsBtn:hover:not(:disabled){background:none;border:0;box-shadow:none}
   #settingsBtn{
     position:fixed;
-    right:max(16px, env(safe-area-inset-right));
-    bottom:max(16px, env(safe-area-inset-bottom));
-    width:52px;height:52px;
-    padding:0;
-    border-radius:50%;
-    background:var(--surface-alt);
-    border:1px solid var(--line);
-    display:flex;align-items:center;justify-content:center;
-    z-index:20;
-    box-shadow:0 2px 8px rgba(48,51,46,.12);
-    transition:background .15s ease, transform .12s ease;
+    right:max(14px, env(safe-area-inset-right));
+    bottom:max(14px, env(safe-area-inset-bottom));
+    width:56px;height:56px;padding:0;border-radius:0;
+    display:flex;align-items:center;justify-content:center;z-index:20;cursor:pointer;
   }
-  #settingsBtn:hover{background:#e5ded1}
-  #settingsBtn:active{transform:translateY(1px)}
   #settingsBtn svg{
-  width:26px;
-  height:26px;
-  display:block;
-  pointer-events:none;
-  transition:transform .4s ease;
+    width:46px;height:46px;display:block;pointer-events:none;
+    fill:var(--ochre);stroke:var(--ink);stroke-width:1.4;
+    filter:drop-shadow(2px 3px 0 var(--terracotta));
+    animation:cogSpin 24s linear infinite;
+    transition:fill .3s ease;
   }
-  #settingsBtn:hover svg{ transform:rotate(45deg); }
+  #settingsBtn:hover svg{fill:var(--sage);animation-duration:3s}
+  #settingsBtn:active svg{transform:scale(.9)}
+  @keyframes cogSpin{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion: reduce){#settingsBtn svg{animation:none}}
 
   /* ---------- Floating lettering instead of big buttons ---------- */
   .floatWord,.floatWord:hover:not(:disabled){background:none;border:0;box-shadow:none}
   #startBtn{
-    align-self:center;margin:22px 0 10px;padding:10px 14px;
+    align-self:center;margin:22px 0 10px;padding:20px 14px;
     font-family:"Press Start 2P","Courier New",monospace;
     font-weight:400;font-size:clamp(2.2rem,12vw,3.2rem);line-height:1;letter-spacing:.04em;
     color:var(--ochre);
@@ -221,8 +224,8 @@
     cursor:pointer;
   }
   #startBtn:hover:not(:disabled){color:#d3b57a}
-  #startBtn:active{transform:translate(3px,3px);text-shadow:1px 1px 0 var(--terracotta-dark)}
-  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+  #startBtn:active{transform:translate(3px,3px) scaleY(1.35);text-shadow:1px 1px 0 var(--terracotta-dark)}
+  @keyframes bob{0%,100%{transform:scaleY(1.35) translateY(0)}50%{transform:scaleY(1.35) translateY(-2px)}}
   .genWrap{padding:10px 14px 14px;display:flex;justify-content:center}
   .aiLink,.aiLink:hover:not(:disabled){background:none;border:0;box-shadow:none}
   .aiLink{
@@ -256,7 +259,7 @@
   /* ---------- Title ---------- */
   h1#title{
     font-family:"Bagel Fat One","Chalkboard SE","Comic Sans MS",sans-serif;font-weight:400;
-    font-size:clamp(2.6rem,14vw,3.6rem);line-height:1.02;letter-spacing:.01em;margin:6px 0 14px;
+    font-size:clamp(3rem,16vw,4.2rem);line-height:1.02;letter-spacing:.01em;margin:6px 0 14px;
     display:flex;flex-wrap:wrap;justify-content:center;gap:0 .32em;
   }
   #title .tw{display:inline-flex}
@@ -313,7 +316,7 @@
 <!-- SETTINGS -->
 <section id="settings" class="screen scroll">
   <div class="card">
-    <button class="secondary backBtn inline" aria-label="Back">← Back</button>
+    <button class="secondary backBtn inline" aria-label="Back">‹ back</button>
     <h1 style="font-size:1.5rem">Settings</h1>
     <label>Round length (seconds)
       <input type="number" id="secs" value="60" min="5" step="5" inputmode="numeric">
@@ -332,7 +335,7 @@
 <!-- AI THEME GENERATOR -->
 <section id="gen" class="screen scroll">
   <div class="card">
-    <button class="secondary backBtn inline" aria-label="Back">← Back</button>
+    <button class="secondary backBtn inline" aria-label="Back">‹ back</button>
     <h1 style="font-size:1.5rem">Generate a theme</h1>
     <label>Gemini API key
       <input type="password" id="apiKey" placeholder="AIza..." autocomplete="off" autocapitalize="off" spellcheck="false">
@@ -369,15 +372,15 @@
 
 <!-- PREP / CALIBRATION -->
 <section id="prep" class="screen">
-  <button class="backBtn" aria-label="Back">← Back</button>
+  <button class="backBtn" aria-label="Back">‹ back</button>
   <div class="msg" id="prepMsg"></div>
   <div class="small" id="prepSub"></div>
 </section>
 
 <!-- GAME -->
 <section id="game" class="screen">
-  <button class="backBtn" aria-label="Back">← Back</button>
-  <button class="secondary finishBtn" id="finishBtn" style="display:none">Finish round</button>
+  <button class="backBtn" aria-label="Back">‹ back</button>
+  <button class="secondary finishBtn" id="finishBtn" style="display:none">finish round ›</button>
   <div id="hud"><span id="timer">60</span><span id="score">0</span></div>
   <div class="big" id="word"></div>
   <div id="rotate">Rotate your phone to landscape</div>
@@ -398,23 +401,7 @@
 
 <!-- Settings cogwheel button (bottom right) -->
 <button id="settingsBtn" aria-label="Settings">
-  <svg viewBox="0 0 24 24" fill="none" stroke="#30332e" stroke-width="1.8"
-       stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-    <circle cx="12" cy="12" r="3"></circle>
-    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83
-             2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33
-             1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09
-             A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06
-             a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82
-             1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09
-             A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06
-             a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33
-             H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09
-             a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06
-             a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9
-             a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09
-             a1.65 1.65 0 0 0-1.51 1z"></path>
-  </svg>
+  <svg viewBox="0 0 24 24" fill-rule="evenodd" stroke-linejoin="round" aria-hidden="true"><path d="M19.96 10.02 L22.90 10.54 L22.90 13.46 L19.96 13.98 L19.03 16.23 L20.74 18.67 L18.67 20.74 L16.23 19.03 L13.98 19.96 L13.46 22.90 L10.54 22.90 L10.02 19.96 L7.77 19.03 L5.33 20.74 L3.26 18.67 L4.97 16.23 L4.04 13.98 L1.10 13.46 L1.10 10.54 L4.04 10.02 L4.97 7.77 L3.26 5.33 L5.33 3.26 L7.77 4.97 L10.02 4.04 L10.54 1.10 L13.46 1.10 L13.98 4.04 L16.23 4.97 L18.67 3.26 L20.74 5.33 L19.03 7.77Z M12 8.4a3.6 3.6 0 1 0 0 7.2a3.6 3.6 0 1 0 0-7.2Z"/></svg>
 </button>
 
 <!-- WORD LISTS: one file per list in lists/. To add one, create lists/<name>.js
@@ -552,7 +539,6 @@
       names.forEach(n => {
         const acts = el("div", "iActs");
         acts.append(
-          mini(ICON.export, "Export as a .js list file", () => exportTheme(n), "s-export"),
           mini(ICON.sparkle, "Generate more entries with AI", () => { moreFor = moreFor === n ? "" : n; moreMsg = { text: "", cls: "" }; renderDrawers(); }, "s-more" + (moreFor === n ? " on" : "")),
           confirmClear === n
             ? mini(ICON.check, "Tap again to clear this theme", () => clearTheme(n), "s-clear warn", "Sure?")
@@ -601,17 +587,6 @@
     const e = $("#moreStatus"); if (e) { e.textContent = text; e.className = "status " + cls; }
   };
 
-  function exportTheme(name){
-    const list = USER[name]; if (!list) return;
-    const txt = "// Exported from Forehead Game. Put this file in lists/ and add a <script src> tag for it in index.html.\n" +
-      "(window.LISTS = window.LISTS || {})[" + JSON.stringify(name) + "] = `\n" + list.join("\n") + "\n`;\n";
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([txt], { type: "text/javascript" }));
-    a.download = slug(name) + ".js";
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-    note("Exported " + a.download, "ok");
-  }
   function clearTheme(n){            // two taps instead of a confirm popup
     if (confirmClear !== n) {
       confirmClear = n; renderDrawers();
@@ -878,8 +853,8 @@
   const fmtTime = n => n >= 60 ? Math.floor(n / 60) + ":" + String(n % 60).padStart(2, "0") : String(n);
   $("#finishBtn").onclick = () => {                   // two taps, so a finger on the edge can't end the round
     if (!finishArmed) {
-      finishArmed = true; $("#finishBtn").textContent = "Tap again to finish";
-      setTimeout(() => { finishArmed = false; $("#finishBtn").textContent = "Finish round"; }, 2500);
+      finishArmed = true; $("#finishBtn").textContent = "tap again to finish";
+      setTimeout(() => { finishArmed = false; $("#finishBtn").textContent = "finish round ›"; }, 2500);
     } else endRound();
   };
   function beginRound(){
@@ -889,7 +864,7 @@
     startAt = performance.now();
     endAt = unlimitedRound ? Infinity : startAt + secs * 1000;
     $("#finishBtn").style.display = unlimitedRound ? "block" : "none";
-    $("#finishBtn").textContent = "Finish round"; finishArmed = false;
+    $("#finishBtn").textContent = "finish round ›"; finishArmed = false;
     phase = "play";
     $("#score").textContent = 0;
     $("#word").textContent = nextWord();
@@ -1213,7 +1188,7 @@ Return JSON only, in the form {"entries": ["...", "..."]}.`;
     $("#genOut").classList.remove("on"); gstat(""); phase = "menu"; show("menu");
     $("#menuNote").className = "status " + (ok ? "ok" : "err");
     $("#menuNote").textContent = ok ? 'Saved "' + name + '" (' + list.length + " entries) under My themes."
-      : 'Could not save to this browser (private mode?). "' + name + '" is usable until you close the page; use Export to keep it.';
+      : 'Could not save to this browser (private mode?). "' + name + '" is usable until you close the page.';
   };
 
   /* ---------- Buttons ---------- */
