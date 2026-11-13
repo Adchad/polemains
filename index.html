@@ -256,6 +256,33 @@
   .seg.s-clear.warn svg{width:18px;height:18px}
   @media (prefers-reduced-motion: reduce){#startBtn,.iActs .seg{animation:none}}
 
+  /* ---------- Hard mode: fancy checkbox + forbidden words ---------- */
+  label.fancyChk{flex-direction:row;align-items:center;gap:14px;cursor:pointer;opacity:1;padding:6px 4px;user-select:none;-webkit-user-select:none;position:relative}
+  .fancyChk input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+  .fancyChk .box{
+    flex:none;width:30px;height:30px;border:2px solid var(--ink);border-radius:9px 12px 9px 12px;background:var(--surface);
+    box-shadow:3px 3px 0 var(--sage);display:grid;place-items:center;transform:rotate(-3deg);
+    transition:background .2s ease,box-shadow .2s ease,transform .35s cubic-bezier(.34,1.56,.64,1);
+  }
+  .fancyChk .box::after{
+    content:"";width:6px;height:13px;border:solid #fffaf4;border-width:0 3.5px 3.5px 0;border-radius:1px;
+    transform:translateY(-1px) rotate(45deg) scale(0);transition:transform .3s cubic-bezier(.34,1.56,.64,1);
+  }
+  .fancyChk input:checked + .box{background:var(--terracotta);box-shadow:3px 3px 0 var(--ochre);transform:rotate(3deg)}
+  .fancyChk input:checked + .box::after{transform:translateY(-1px) rotate(45deg) scale(1)}
+  .fancyChk input:focus-visible + .box{outline:3px solid var(--ochre);outline-offset:2px}
+  .fancyChk input:disabled + .box{opacity:.5}
+  .fancyChk .txt{display:flex;flex-direction:column;gap:1px;font-family:"Fredoka","Segoe UI",system-ui,sans-serif;font-weight:600;font-size:1.1rem;color:var(--ink);line-height:1.15}
+  .fancyChk .txt small{font-weight:500;font-size:.8rem;color:var(--muted)}
+  #hardWrap{align-self:center;animation:popIn .4s cubic-bezier(.34,1.56,.64,1) both}
+  @keyframes popIn{from{opacity:0;transform:scale(.85) translateY(-6px)}to{opacity:1;transform:none}}
+  #forbid{display:flex;flex-wrap:wrap;justify-content:center;gap:.15em .9em;margin-top:2.2vh;padding:0 6vw;color:#bb3b2d;font-weight:800;font-size:min(6.4vw,10.5vh);line-height:1.1}
+  #forbid span::before{content:"×";margin-right:.22em;opacity:.65;font-weight:600}
+  #forbid:empty{display:none}
+  #game.hard .big{font-size:min(12.5vw,20vh)}
+  .more .fancyChk .txt{font-size:1rem}
+  @media (prefers-reduced-motion: reduce){#hardWrap{animation:none}.fancyChk .box,.fancyChk .box::after{transition:none}}
+
   /* ---------- Title ---------- */
   h1#title{
     font-family:"Bagel Fat One","Chalkboard SE","Comic Sans MS",sans-serif;font-weight:400;
@@ -312,6 +339,7 @@
     <h1 id="title" aria-label="Le gros front"></h1>
     <p id="pickLbl">Pick a theme:</p>
     <div id="drawers" class="drawers"></div>
+    <label class="fancyChk" id="hardWrap" style="display:none"><input type="checkbox" id="hardOn"><span class="box"></span><span class="txt">Hard mode<small>forbidden words shown under each term</small></span></label>
     <p class="status" id="menuNote"></p>
     <label id="customWrap" style="display:none">Your words (comma or new line separated)
       <textarea id="custom" placeholder="pizza, Eiffel Tower, karaoke..."></textarea>
@@ -354,6 +382,7 @@
     <label>Number of entries
       <input type="number" id="genCount" value="150" min="10" max="500" step="10">
     </label>
+    <label class="fancyChk"><input type="checkbox" id="genHard" checked><span class="box"></span><span class="txt">Hard mode<small>also write forbidden words for each entry</small></span></label>
     <details>
       <summary>Advanced</summary>
       <label>Model (leave empty to pick one automatically)
@@ -366,7 +395,7 @@
       <label>Theme name
         <input type="text" id="genName" maxlength="40" autocomplete="off">
       </label>
-      <label><span id="genCountLbl">Entries</span> (one per line, edit freely)
+      <label><span id="genCountLbl">Entries</span> (one per line, edit freely; hard mode lines look like Term|forbidden, words)
         <textarea id="genList"></textarea>
       </label>
       <div class="row">
@@ -390,6 +419,7 @@
   <button class="secondary finishBtn" id="finishBtn" style="display:none">finish round ›</button>
   <div id="hud"><span id="timer">60</span><span id="score">0</span></div>
   <div class="big" id="word"></div>
+  <div id="forbid"></div>
   <div id="rotate">Rotate your phone to landscape</div>
 </section>
 
@@ -431,6 +461,14 @@
   for (const [name, txt] of Object.entries(LISTS))
     DECKS[name] = txt.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
 
+
+  // List format: "Term" or "Term|forbidden word, forbidden word" (hard mode). Everything after the pipe is forbidden.
+  function splitEntry(e){
+    const i = e.indexOf("|");
+    if (i < 0) return { t: e.trim(), f: [] };
+    return { t: e.slice(0, i).trim(), f: e.slice(i + 1).split(/[,;|]/).map(x => x.trim()).filter(Boolean) };
+  }
+  const hasHard = list => list.some(e => e.indexOf("|") > 0 && splitEntry(e).f.length);
 
   const $ = s => document.querySelector(s);
   const screens = ["menu","settings","gen","prep","game","results"];
@@ -482,7 +520,19 @@
     curDeck = v || "";
     syncDeck(); renderDrawers();
   }
-  function syncDeck(){ $("#customWrap").style.display = curDeck === CUSTOM ? "flex" : "none"; }
+  function deckList(){
+    if (curDeck.startsWith("u:")) return USER[curDeck.slice(2)] || [];
+    if (curDeck.startsWith("b:")) return DECKS[curDeck.slice(2)] || [];
+    return [];
+  }
+  function syncDeck(){
+    $("#customWrap").style.display = curDeck === CUSTOM ? "flex" : "none";
+    const hw = $("#hardWrap"), want = hasHard(deckList());       // the checkbox only exists for lists that have forbidden words
+    if (want && hw.style.display === "none") { hw.style.display = "flex"; hw.style.animation = "none"; void hw.offsetWidth; hw.style.animation = ""; }
+    else if (!want) hw.style.display = "none";
+  }
+  $("#hardOn").checked = store.get("fg_hard", "0") === "1";
+  $("#hardOn").onchange = () => store.set("fg_hard", $("#hardOn").checked ? "1" : "0");
   let drawTimer = 0;
   function deselect(redraw = true){
     curDeck = ""; moreFor = ""; confirmClear = ""; syncDeck(); note("");
@@ -497,6 +547,7 @@
   function pickItem(v){ note(""); if (curDeck !== v) { moreFor = ""; confirmClear = ""; } pickDeck(v); store.set("fg_deck", v); }
 
   function renderDrawers(){
+    syncDeck();
     const host = $("#drawers"), keep = {};
     host.querySelectorAll(".dBody").forEach(b => keep[b.dataset.d] = b.scrollTop);
     host.textContent = "";
@@ -590,6 +641,8 @@
     return box;
   }
 
+  const moreHard = {};          // per theme: generate forbidden words too? (default: yes if the list already has them)
+  const wantHard = n => n in moreHard ? moreHard[n] : hasHard(USER[n]);
   function morePanel(n){
     const p = el("div", "more");
     p.append(el("p", "hint", "Sends your " + USER[n].length + " current entries to Gemini so it finds different ones."));
@@ -597,6 +650,10 @@
     const inp = el("input"); inp.type = "number"; inp.min = 10; inp.max = 500; inp.step = 10; inp.value = moreCount; inp.disabled = moreBusy;
     inp.oninput = () => { moreCount = Math.max(10, Math.min(500, parseInt(inp.value, 10) || 100)); };
     lab.append(inp); p.append(lab);
+    const hc = el("label", "fancyChk"), hi = el("input"); hi.type = "checkbox"; hi.checked = wantHard(n); hi.disabled = moreBusy;
+    hi.onchange = () => { moreHard[n] = hi.checked; };
+    const ht = el("span", "txt", "Hard mode"); ht.append(el("small", null, "also write forbidden words for the new entries"));
+    hc.append(hi, el("span", "box"), ht); p.append(hc);
     const row = el("div", "row");
     const add = el("button", null, moreBusy ? "Working…" : "Add to list"); add.disabled = moreBusy; add.onclick = () => generateMore(n, "add");
     const rep = el("button", "secondary", "Replace list"); rep.disabled = moreBusy; rep.onclick = () => generateMore(n, "replace");
@@ -814,6 +871,12 @@
 
   const shuffle = a => { for (let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]];} return a; };
   const nextWord = () => { if (!queue.length) queue = shuffle(words.slice()); return queue.pop(); };
+  let hardRound = false;
+  function showNext(){
+    const { t, f } = splitEntry(nextWord()), fb = $("#forbid");
+    $("#word").textContent = t; fb.textContent = "";
+    if (hardRound) f.forEach(w => fb.append(el("span", null, w)));
+  }
 
   function getWords(){
     if (curDeck === CUSTOM) {
@@ -901,6 +964,7 @@
   async function startInner(my){
     const nap = async ms => { await sleep(ms); if (my !== run) throw CANCEL; };
     words = getWords();
+    hardRound = curDeck !== CUSTOM && $("#hardWrap").style.display !== "none" && $("#hardOn").checked;
     if (!curDeck) { note("Pick a theme first.", "err"); return; }
     if (words.length < 3) { note("Need at least 3 entries in the theme.", "err"); return; }
     store.set("fg_deck", curDeck);
@@ -974,8 +1038,8 @@
     $("#finishBtn").textContent = "finish round ›"; finishArmed = false;
     phase = "play";
     $("#score").textContent = 0;
-    $("#word").textContent = nextWord();
-    $("#game").className = "screen active";
+    showNext();
+    $("#game").className = "screen active" + (hardRound ? " hard" : "");
     show("game"); beep(880, 0.25); buzz(150);
   }
 
@@ -985,12 +1049,12 @@
     lock = true; armed = false; holdDir = 0;
     const w = $("#word").textContent;
     const g = $("#game");
-    if (kind === "ok") { correct.push(w); g.classList.add("ok"); $("#word").textContent = "Correct!"; bell(); buzz(60); }
-    else { passed.push(w); g.classList.add("pass"); $("#word").textContent = "PASS"; womp(); buzz([40,40,40]); }
+    if (kind === "ok") { correct.push(w); g.classList.add("ok"); $("#word").textContent = "Correct!"; $("#forbid").textContent = ""; bell(); buzz(60); }
+    else { passed.push(w); g.classList.add("pass"); $("#word").textContent = "PASS"; $("#forbid").textContent = ""; womp(); buzz([40,40,40]); }
     $("#score").textContent = correct.length;
     setTimeout(() => {
       g.classList.remove("ok","pass");
-      if (phase === "play") $("#word").textContent = nextWord();
+      if (phase === "play") showNext();
       lock = false;
       // Must return to neutral before next answer registers
       armed = false;
@@ -1062,10 +1126,16 @@
   const gstat = (msg, cls="") => { const e = $("#genStatus"); e.textContent = msg; e.className = "status " + cls; };
 
   // The prompt: this is what decides the quality of the lists.
-  function buildPrompt(theme, total, avoid){
+  function buildPrompt(theme, total, avoid, hard){
     const task = avoid && avoid.length
       ? `ALREADY IN THE LIST (${avoid.length} entries). Do NOT repeat any of them, nor near-duplicates or other spellings of them. Find DIFFERENT items that fit the same theme, in the same style and difficulty mix:\n${avoid.slice(0, 1000).join("\n")}\n\nWrite ${total} different NEW entries that belong to this theme.`
       : `Write ${total} different entries that belong to this theme.`;
+    const fmt = hard
+      ? `2. Format: each entry is ONE string of the form "Term|forbidden1, forbidden2, forbidden3". The term is a name or short phrase of 1 to 5 words, in its most common form (no numbering, explanations, parentheses, quotes or notes, and no years unless they are part of the name), then a pipe character |, then 3 to 5 forbidden words separated by commas.`
+      : `2. Format: each entry is a name or short phrase of 1 to 5 words, in its most common form. No numbering, explanations, parentheses, quotes or notes, and no years unless they are part of the name. Do not use the pipe character.`;
+    const forb = hard ? `
+HARD MODE, the forbidden words: these are words the clue-givers are NOT allowed to say, exactly like the cards in the game Taboo. For each term pick the 3 to 5 words that players would most naturally blurt out to make the guesser find it: its most obvious associations and the things most closely tied to it. For a person: their job, best-known work, group, nickname or catchphrase. For a film, series or game: the franchise, director, lead actor or character, genre, studio. For an object, place or concept: its category, typical use, location, and its most obvious synonym. For a technical term: the closest related terms. Rules for forbidden words: each is a single word or a very short phrase (at most 2 words); never the term itself, a word of the term, or a plural or conjugation of it; no two forbidden words from the same root; written in the same language as the term; and no commas or pipes inside them. Example of the format: "Taylor Swift|Eras Tour, Swiftie, pop star, Kanye, Grammy".
+` : "";
     return `You are writing the word list for a party guessing game (like Heads Up! or charades). One player holds a phone on their forehead; their friends give spoken clues or act things out until that player guesses the word on the screen.
 
 THEME: ${JSON.stringify(theme)}
@@ -1074,7 +1144,7 @@ ${task}
 
 Requirements:
 1. Guessable: every entry must be something most players would recognise and be able to describe or act out. Prefer well-known, specific things over obscure ones. If the theme is niche, stick to the best-known items of that niche.
-2. Format: each entry is a name or short phrase of 1 to 5 words, in its most common form. No numbering, explanations, parentheses, quotes or notes, and no years unless they are part of the name.
+${fmt}
 3. Distinct: no duplicates or near-duplicates (the same thing spelled differently, or many sequels or variants of one thing).
 4. Difficulty mix: roughly 50% easy, 35% medium, 15% hard.
 5. Breadth: cover the whole theme and its different sub-areas instead of clustering on one. Put the entries in random order.
@@ -1082,30 +1152,36 @@ Requirements:
 7. Real and accurate: only include things that really exist, unless the theme is explicitly fictional. Never invent entries.
 8. Keep everything suitable for a general audience: no slurs, no graphic or sexual content.
 9. If the theme is ambiguous, choose the most common reading for a party game.
-
+${forb}
 Return JSON only, in the form {"entries": ["...", "..."]}.`;
   }
 
   const norm = e => e.normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
-  function cleanEntries(arr){
+  function cleanEntries(arr, hard = true){
     const seen = new Set(), out = [];
     for (let e of arr) {
       if (typeof e !== "string") continue;
       e = e.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "").replace(/[`\\"“”]/g, "").replace(/\$\{/g, "").replace(/\s+/g, " ").trim();
-      if (!e || e.length > 60) continue;
-      const k = norm(e) || e.toLowerCase();
+      const sp = splitEntry(e), t = sp.t;
+      if (!t || t.length > 60) continue;
+      const k = norm(t) || t.toLowerCase();
       if (seen.has(k)) continue;
-      seen.add(k); out.push(e);
+      let f = [];
+      if (hard) {                                          // tidy the forbidden words: no term, no repeats, short, max 6
+        const fs = new Set([k]);
+        for (const w of sp.f) { const wk = norm(w) || w.toLowerCase(); if (w.length > 30 || fs.has(wk)) continue; fs.add(wk); f.push(w); if (f.length >= 6) break; }
+      }
+      seen.add(k); out.push(f.length ? t + "|" + f.join(", ") : t);
     }
     return out;
   }
-  function parseEntries(text){
+  function parseEntries(text, hard = true){
     try {
       const j = JSON.parse(text);
       const a = Array.isArray(j) ? j : (j && Array.isArray(j.entries) ? j.entries : null);
-      if (a) return cleanEntries(a);
+      if (a) return cleanEntries(a, hard);
     } catch(e){}
-    return cleanEntries(text.split(/\r?\n/));      // fallback if the model ignored the JSON format
+    return cleanEntries(text.split(/\r?\n/), hard);      // fallback if the model ignored the JSON format
   }
 
   // Ranked list of usable models: fast Flash-Lite first, then Flash; newer and stable versions first.
@@ -1128,6 +1204,7 @@ Return JSON only, in the form {"entries": ["...", "..."]}.`;
   // a word list. We ask for no/minimal thinking; models that don't accept a setting make us fall to the next one.
   // Request variants, tried in order. Google's 400 error is often just "invalid argument" with no hint
   // about which setting the model dislikes, so ANY 400 (except a bad key) moves on to the next variant.
+  let genMaxTokens = 8192;               // hard mode lists are several times longer
   const THINK = [
     { think: { thinkingBudget: 0 } },
     { think: { thinkingLevel: "minimal" } },
@@ -1142,7 +1219,7 @@ Return JSON only, in the form {"entries": ["...", "..."]}.`;
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
-          temperature: 1, maxOutputTokens: 8192, responseMimeType: "application/json",
+          temperature: 1, maxOutputTokens: genMaxTokens, responseMimeType: "application/json",
           ...(v.think ? { thinkingConfig: v.think } : {}),
           ...(v.plain ? {} : { responseSchema: { type: "OBJECT", properties: { entries: { type: "ARRAY", items: { type: "STRING" } } }, required: ["entries"] } })
         }
@@ -1168,7 +1245,7 @@ Return JSON only, in the form {"entries": ["...", "..."]}.`;
     return (e.message || String(e)) + tech;
   }
 
-  const keyOf = e => norm(e) || e.toLowerCase();
+  const keyOf = e => { const t = splitEntry(e).t; return norm(t) || t.toLowerCase(); };
   const TMO = 45000;       // per attempt: a model that is this slow gets skipped for the next one
 
   // Live status with an elapsed-seconds counter
@@ -1219,11 +1296,14 @@ Return JSON only, in the form {"entries": ["...", "..."]}.`;
 
   /* ----- Generate screen ----- */
   let genRun = 0, lastGenTheme = "";
+  $("#genHard").checked = store.get("fg_gen_hard", "1") === "1";            // hard mode generation is on by default
   $("#genBtn").onclick = async () => {
     const my = ++genRun;
     const key = $("#apiKey").value.trim();
     const theme = $("#genTheme").value.replace(/\s+/g, " ").trim();
     const want = Math.max(10, Math.min(500, parseInt($("#genCount").value, 10) || 150));
+    const hard = $("#genHard").checked; store.set("fg_gen_hard", hard ? "1" : "0");
+    genMaxTokens = hard ? 20000 : 8192;
     $("#genOut").classList.remove("on");
     if (!key) return gstat("Paste your Gemini API key first.", "err");
     if (!theme) return gstat("Type a theme first.", "err");
@@ -1232,9 +1312,9 @@ Return JSON only, in the form {"entries": ["...", "..."]}.`;
     const pg = progress(m => gstat(m));
     try {
       const total = want + Math.ceil(want * 0.15);          // ask for extra, duplicates get removed then we trim
-      const { text, model } = await askGemini(key, buildPrompt(theme, total), m => pg.prog(m.replace(/…$/, "") + " for " + want + " entries…"));
+      const { text, model } = await askGemini(key, buildPrompt(theme, total, null, hard), m => pg.prog(m.replace(/…$/, "") + " for " + want + " entries…"));
       if (my !== genRun) return;
-      const entries = parseEntries(text).slice(0, want);
+      const entries = parseEntries(text, hard).slice(0, want);
       if (entries.length < 3) throw new Error("Gemini did not return a usable list. Try again or reword the theme.");
       lastGenTheme = theme;
       $("#genName").value = theme.length > 40 ? theme.slice(0, 40).trim() : theme;
@@ -1255,14 +1335,15 @@ Return JSON only, in the form {"entries": ["...", "..."]}.`;
     if (moreBusy || !USER[name]) return;
     const key = ($("#apiKey").value || store.get("fg_gemini_key", "")).trim();
     if (!key) { moreMsg = { text: "Add your Gemini API key first (on the Generate screen).", cls: "err", needKey: true }; renderDrawers(); return; }
-    const old = USER[name].slice(), want = Math.max(10, Math.min(500, moreCount || 100));
+    const old = USER[name].slice(), want = Math.max(10, Math.min(500, moreCount || 100)), hard = wantHard(name);
+    genMaxTokens = hard ? 20000 : 8192;
     moreBusy = true; undoInfo = null; setMore("Starting…"); renderDrawers();
     const pg = progress(m => setMore(m));
     try {
       const total = want + Math.ceil(want * 0.3);          // extra, because some will be repeats
-      const { text, model } = await askGemini(key, buildPrompt(META[name] || name, total, old), m => pg.prog(m.replace(/…$/, "") + " for " + want + " new entries…"));
+      const { text, model } = await askGemini(key, buildPrompt(META[name] || name, total, old.map(e => splitEntry(e).t), hard), m => pg.prog(m.replace(/…$/, "") + " for " + want + " new entries…"));
       const seen = new Set(old.map(keyOf));
-      const parsed = parseEntries(text);
+      const parsed = parseEntries(text, hard);
       const fresh = parsed.filter(e => !seen.has(keyOf(e))).slice(0, want);
       const repeats = parsed.length - parsed.filter(e => !seen.has(keyOf(e))).length;
       if (mode === "replace") { if (fresh.length < 10) throw new Error("Gemini returned only " + fresh.length + " new entries, so your list was kept. Try again."); }
