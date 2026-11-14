@@ -1,14 +1,14 @@
 {
-  "name": "Forehead Game",
-  "short_name": "Forehead",
+  "name": "Le gros front",
+  "short_name": "Gros front",
   "description": "Phone on your forehead: tilt down when you guess, tilt up to pass.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "display_override": ["fullscreen", "standalone"],
   "orientation": "any",
-  "background_color": "#111827",
-  "theme_color": "#111827",
+  "background_color": "#f4f0e8",
+  "theme_color": "#f4f0e8",
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },

@@ -148,8 +148,16 @@
   #game{background:transparent;color:var(--ink)}
   #game.ok{background:#87977a;color:#fffaf4}
   #game.pass{background:#c47b62;color:#fffaf4}
-  .backBtn,.finishBtn{background:#e8e2d7;color:var(--ink);border:1px solid var(--line);border-radius:8px}
-  .backBtn:hover:not(:disabled),.finishBtn:hover:not(:disabled){background:#ded7ca}
+  .backBtn,.finishBtn,.backBtn:hover:not(:disabled),.finishBtn:hover:not(:disabled){
+    background:none;border:0;box-shadow:none;color:inherit;
+    font-family:"Fredoka","Segoe UI",system-ui,sans-serif;font-weight:600;letter-spacing:.01em;
+  }
+  .backBtn{padding:8px 10px;font-size:1.1rem;opacity:.75;transition:opacity .15s,transform .2s cubic-bezier(.34,1.56,.64,1)}
+  .finishBtn{padding:8px 10px;font-size:1.1rem;opacity:.75;transition:opacity .15s,transform .2s cubic-bezier(.34,1.56,.64,1)}
+  .backBtn:hover:not(:disabled),.finishBtn:hover:not(:disabled){opacity:1}
+  .backBtn:hover:not(:disabled){transform:translateX(-3px)}
+  .finishBtn:hover:not(:disabled){transform:translateX(3px)}
+  .screen:not(#game) .backBtn{color:var(--ink)}
   ul.res li{background:var(--surface-alt);border-radius:6px}
   ul.res li.c{border-left-color:var(--sage)}
   ul.res li.p{border-left-color:var(--terracotta)}
@@ -171,7 +179,7 @@
                border-top-color .2s ease;
   }
   .drawer.open .dBody{
-    max-height:min(36vh,300px);
+    max-height:min(36vh,300px,max(120px,calc(100vh - 560px)));   /* leave room for title, checkbox and Play so the menu doesn't scroll */
     opacity:1;
     border-top-color:var(--line);
   }
@@ -184,35 +192,30 @@
   }
 
   /* ---------- Settings cogwheel button (bottom right) ---------- */
+  #settingsBtn,#settingsBtn:hover:not(:disabled){background:none;border:0;box-shadow:none}
   #settingsBtn{
     position:fixed;
-    right:max(16px, env(safe-area-inset-right));
-    bottom:max(16px, env(safe-area-inset-bottom));
-    width:52px;height:52px;
-    padding:0;
-    border-radius:50%;
-    background:var(--surface-alt);
-    border:1px solid var(--line);
-    display:flex;align-items:center;justify-content:center;
-    z-index:20;
-    box-shadow:0 2px 8px rgba(48,51,46,.12);
-    transition:background .15s ease, transform .12s ease;
+    right:max(14px, env(safe-area-inset-right));
+    bottom:max(14px, env(safe-area-inset-bottom));
+    width:56px;height:56px;padding:0;border-radius:0;
+    display:flex;align-items:center;justify-content:center;z-index:20;cursor:pointer;
   }
-  #settingsBtn:hover{background:#e5ded1}
-  #settingsBtn:active{transform:translateY(1px)}
   #settingsBtn svg{
-  width:26px;
-  height:26px;
-  display:block;
-  pointer-events:none;
-  transition:transform .4s ease;
+    width:46px;height:46px;display:block;pointer-events:none;
+    fill:var(--ochre);stroke:var(--ink);stroke-width:1.4;
+    filter:drop-shadow(2px 3px 0 var(--terracotta));
+    animation:cogSpin 24s linear infinite;
+    transition:fill .3s ease;
   }
-  #settingsBtn:hover svg{ transform:rotate(45deg); }
+  #settingsBtn:hover svg{fill:var(--sage);animation-duration:3s}
+  #settingsBtn:active svg{transform:scale(.9)}
+  @keyframes cogSpin{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion: reduce){#settingsBtn svg{animation:none}}
 
   /* ---------- Floating lettering instead of big buttons ---------- */
   .floatWord,.floatWord:hover:not(:disabled){background:none;border:0;box-shadow:none}
   #startBtn{
-    align-self:center;margin:22px 0 10px;padding:10px 14px;
+    align-self:center;margin:4px 0 0;padding:14px 14px;
     font-family:"Press Start 2P","Courier New",monospace;
     font-weight:400;font-size:clamp(2.2rem,12vw,3.2rem);line-height:1;letter-spacing:.04em;
     color:var(--ochre);
@@ -221,8 +224,8 @@
     cursor:pointer;
   }
   #startBtn:hover:not(:disabled){color:#d3b57a}
-  #startBtn:active{transform:translate(3px,3px);text-shadow:1px 1px 0 var(--terracotta-dark)}
-  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+  #startBtn:active{transform:translate(3px,3px) scaleY(1.35);text-shadow:1px 1px 0 var(--terracotta-dark)}
+  @keyframes bob{0%,100%{transform:scaleY(1.35) translateY(0)}50%{transform:scaleY(1.35) translateY(-2px)}}
   .genWrap{padding:10px 14px 14px;display:flex;justify-content:center}
   .aiLink,.aiLink:hover:not(:disabled){background:none;border:0;box-shadow:none}
   .aiLink{
@@ -253,17 +256,53 @@
   .seg.s-clear.warn svg{width:18px;height:18px}
   @media (prefers-reduced-motion: reduce){#startBtn,.iActs .seg{animation:none}}
 
+  /* ---------- Hard mode: fancy checkbox + forbidden words ---------- */
+  label.fancyChk{flex-direction:row;align-items:center;gap:14px;cursor:pointer;opacity:1;padding:2px 4px;user-select:none;-webkit-user-select:none;position:relative}
+  .fancyChk input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+  .fancyChk .box{
+    flex:none;width:30px;height:30px;border:2px solid var(--ink);border-radius:9px 12px 9px 12px;background:var(--surface);
+    box-shadow:3px 3px 0 var(--sage);display:grid;place-items:center;transform:rotate(-3deg);
+    transition:background .2s ease,box-shadow .2s ease,transform .35s cubic-bezier(.34,1.56,.64,1);
+  }
+  .fancyChk .box::after{
+    content:"";width:6px;height:13px;border:solid #fffaf4;border-width:0 3.5px 3.5px 0;border-radius:1px;
+    transform:translateY(-1px) rotate(45deg) scale(0);transition:transform .3s cubic-bezier(.34,1.56,.64,1);
+  }
+  .fancyChk input:checked + .box{background:var(--terracotta);box-shadow:3px 3px 0 var(--ochre);transform:rotate(3deg)}
+  .fancyChk input:checked + .box::after{transform:translateY(-1px) rotate(45deg) scale(1)}
+  .fancyChk input:focus-visible + .box{outline:3px solid var(--ochre);outline-offset:2px}
+  .fancyChk input:disabled + .box{opacity:.5}
+  .fancyChk .txt{display:flex;flex-direction:column;gap:1px;font-family:"Fredoka","Segoe UI",system-ui,sans-serif;font-weight:600;font-size:1.1rem;color:var(--ink);line-height:1.15}
+  .fancyChk .txt small{font-weight:500;font-size:.8rem;color:var(--muted)}
+  /* the hard-mode checkbox lives in a slot that is always there, so Play never moves when it appears */
+  #slot{min-height:48px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  #slot .status{min-height:0;margin:0;text-align:center}
+  #hardWrap{align-self:center;animation:popIn .4s cubic-bezier(.34,1.56,.64,1) both}
+  @keyframes popIn{from{opacity:0;transform:scale(.85) translateY(-6px)}to{opacity:1;transform:none}}
+  #forbid{display:flex;flex-wrap:wrap;justify-content:center;gap:.15em .9em;margin-top:2.2vh;padding:0 6vw;color:#bb3b2d;font-weight:800;font-size:min(6.4vw,10.5vh);line-height:1.1}
+  #forbid span::before{content:"×";margin-right:.22em;opacity:.65;font-weight:600}
+  #forbid:empty{display:none}
+  #game.hard .big{font-size:min(12.5vw,20vh)}
+  .more .fancyChk .txt{font-size:1rem}
+  @media (prefers-reduced-motion: reduce){#hardWrap{animation:none}.fancyChk .box,.fancyChk .box::after{transition:none}}
+
   /* ---------- Title ---------- */
   h1#title{
     font-family:"Bagel Fat One","Chalkboard SE","Comic Sans MS",sans-serif;font-weight:400;
-    font-size:clamp(2.6rem,14vw,3.6rem);line-height:1.02;letter-spacing:.01em;margin:6px 0 14px;
+    font-size:clamp(3rem,16vw,4.2rem);line-height:1.02;letter-spacing:.01em;margin:6px 0 14px;
     display:flex;flex-wrap:wrap;justify-content:center;gap:0 .32em;
   }
-  #title .tw{display:inline-flex}
+  #title .tw{display:inline-flex;padding:2px 4px}
+  #title.phys{display:block;position:relative;width:100%}
+  #title.phys .tw{position:absolute;left:0;top:0;touch-action:none;cursor:grab;will-change:transform}
+  #title.phys .tw.drag{cursor:grabbing;z-index:3}
   #title .tl{display:inline-block;transform:rotate(var(--r));text-shadow:2px 3px 0 rgba(48,51,46,.14);animation:wiggle 3.6s ease-in-out var(--d) infinite}
   @keyframes wiggle{0%,100%{transform:rotate(var(--r)) translateY(0)}50%{transform:rotate(calc(var(--r) * -1)) translateY(-3px)}}
 
   /* ---------- Whimsical pastel drawers ---------- */
+  #pickLbl{margin:2px 0 -4px;text-align:left;padding-left:6px;font-family:"Fredoka","Segoe UI",system-ui,sans-serif;font-weight:500;font-size:.95rem;color:var(--muted)}
+  /* tapping a drawer header must not recolour it */
+  .dHead,.dHead:hover:not(:disabled),.dHead:active,.dHead:focus{background:transparent !important;color:var(--ink)}
   .drawers{gap:16px}
   .drawer{border:2px solid var(--ink);overflow:hidden}
   .drawer.dB{background:#e9eee2;border-radius:26px 14px 28px 14px;transform:rotate(-.5deg);box-shadow:4px 5px 0 var(--sage)}
@@ -301,8 +340,12 @@
 <section id="menu" class="screen scroll active">
   <div class="card">
     <h1 id="title" aria-label="Le gros front"></h1>
+    <p id="pickLbl">Pick a theme:</p>
     <div id="drawers" class="drawers"></div>
-    <p class="status" id="menuNote"></p>
+    <div id="slot">
+      <label class="fancyChk" id="hardWrap" style="display:none"><input type="checkbox" id="hardOn"><span class="box"></span><span class="txt">Hard mode<small>forbidden words under each term</small></span></label>
+      <p class="status" id="menuNote"></p>
+    </div>
     <label id="customWrap" style="display:none">Your words (comma or new line separated)
       <textarea id="custom" placeholder="pizza, Eiffel Tower, karaoke..."></textarea>
     </label>
@@ -313,7 +356,7 @@
 <!-- SETTINGS -->
 <section id="settings" class="screen scroll">
   <div class="card">
-    <button class="secondary backBtn inline" aria-label="Back">← Back</button>
+    <button class="secondary backBtn inline" aria-label="Back">‹ back</button>
     <h1 style="font-size:1.5rem">Settings</h1>
     <label>Round length (seconds)
       <input type="number" id="secs" value="60" min="5" step="5" inputmode="numeric">
@@ -323,6 +366,7 @@
       <input type="range" id="tiltDeg" min="25" max="65" step="5" value="40">
       <span class="small" style="margin:0;font-size:.8rem">Lower = more sensitive. Raise it if it answers by accident.</span>
     </label>
+    <label class="chk"><input type="checkbox" id="uiSound" checked> Menu sounds (soft boops and bips)</label>
     <label class="chk"><input type="checkbox" id="touchOn" checked> Tap the screen to answer (bottom = correct, top = pass)</label>
     <button class="secondary" id="recalBtn">Recalibrate tilt direction next game</button>
     <p class="small" id="sensorNote"></p>
@@ -332,7 +376,7 @@
 <!-- AI THEME GENERATOR -->
 <section id="gen" class="screen scroll">
   <div class="card">
-    <button class="secondary backBtn inline" aria-label="Back">← Back</button>
+    <button class="secondary backBtn inline" aria-label="Back">‹ back</button>
     <h1 style="font-size:1.5rem">Generate a theme</h1>
     <label>Gemini API key
       <input type="password" id="apiKey" placeholder="AIza..." autocomplete="off" autocapitalize="off" spellcheck="false">
@@ -344,6 +388,7 @@
     <label>Number of entries
       <input type="number" id="genCount" value="150" min="10" max="500" step="10">
     </label>
+    <label class="fancyChk"><input type="checkbox" id="genHard" checked><span class="box"></span><span class="txt">Hard mode<small>also write forbidden words for each entry</small></span></label>
     <details>
       <summary>Advanced</summary>
       <label>Model (leave empty to pick one automatically)
@@ -356,7 +401,7 @@
       <label>Theme name
         <input type="text" id="genName" maxlength="40" autocomplete="off">
       </label>
-      <label><span id="genCountLbl">Entries</span> (one per line, edit freely)
+      <label><span id="genCountLbl">Entries</span> (one per line, edit freely; hard mode lines look like Term|forbidden, words)
         <textarea id="genList"></textarea>
       </label>
       <div class="row">
@@ -369,17 +414,18 @@
 
 <!-- PREP / CALIBRATION -->
 <section id="prep" class="screen">
-  <button class="backBtn" aria-label="Back">← Back</button>
+  <button class="backBtn" aria-label="Back">‹ back</button>
   <div class="msg" id="prepMsg"></div>
   <div class="small" id="prepSub"></div>
 </section>
 
 <!-- GAME -->
 <section id="game" class="screen">
-  <button class="backBtn" aria-label="Back">← Back</button>
-  <button class="secondary finishBtn" id="finishBtn" style="display:none">Finish round</button>
+  <button class="backBtn" aria-label="Back">‹ back</button>
+  <button class="secondary finishBtn" id="finishBtn" style="display:none">finish round ›</button>
   <div id="hud"><span id="timer">60</span><span id="score">0</span></div>
   <div class="big" id="word"></div>
+  <div id="forbid"></div>
   <div id="rotate">Rotate your phone to landscape</div>
 </section>
 
@@ -398,23 +444,7 @@
 
 <!-- Settings cogwheel button (bottom right) -->
 <button id="settingsBtn" aria-label="Settings">
-  <svg viewBox="0 0 24 24" fill="none" stroke="#30332e" stroke-width="1.8"
-       stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-    <circle cx="12" cy="12" r="3"></circle>
-    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83
-             2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33
-             1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09
-             A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06
-             a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82
-             1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09
-             A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06
-             a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33
-             H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09
-             a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06
-             a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9
-             a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09
-             a1.65 1.65 0 0 0-1.51 1z"></path>
-  </svg>
+  <svg viewBox="0 0 24 24" fill-rule="evenodd" stroke-linejoin="round" aria-hidden="true"><path d="M19.96 10.02 L22.90 10.54 L22.90 13.46 L19.96 13.98 L19.03 16.23 L20.74 18.67 L18.67 20.74 L16.23 19.03 L13.98 19.96 L13.46 22.90 L10.54 22.90 L10.02 19.96 L7.77 19.03 L5.33 20.74 L3.26 18.67 L4.97 16.23 L4.04 13.98 L1.10 13.46 L1.10 10.54 L4.04 10.02 L4.97 7.77 L3.26 5.33 L5.33 3.26 L7.77 4.97 L10.02 4.04 L10.54 1.10 L13.46 1.10 L13.98 4.04 L16.23 4.97 L18.67 3.26 L20.74 5.33 L19.03 7.77Z M12 8.4a3.6 3.6 0 1 0 0 7.2a3.6 3.6 0 1 0 0-7.2Z"/></svg>
 </button>
 
 <!-- WORD LISTS: one file per list in lists/. To add one, create lists/<name>.js
@@ -437,6 +467,14 @@
   for (const [name, txt] of Object.entries(LISTS))
     DECKS[name] = txt.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
 
+
+  // List format: "Term" or "Term|forbidden word, forbidden word" (hard mode). Everything after the pipe is forbidden.
+  function splitEntry(e){
+    const i = e.indexOf("|");
+    if (i < 0) return { t: e.trim(), f: [] };
+    return { t: e.slice(0, i).trim(), f: e.slice(i + 1).split(/[,;|]/).map(x => x.trim()).filter(Boolean) };
+  }
+  const hasHard = list => list.some(e => e.indexOf("|") > 0 && splitEntry(e).f.length);
 
   const $ = s => document.querySelector(s);
   const screens = ["menu","settings","gen","prep","game","results"];
@@ -467,6 +505,7 @@
 
   /* ---------- Deck UI: two inline drawers (no popups) ---------- */
   const CUSTOM = "__custom__";
+  let uiSoundOn = store.get("fg_ui_sound", "1") === "1";   // soft menu sounds on/off (settings)
   let curDeck = "";              // the active theme: "b:<name>" (built-in), "u:<name>" (mine) or CUSTOM
   let DRAW = null;               // which drawers are open: {b:bool, u:bool}
   try { DRAW = JSON.parse(store.get("fg_drawers", "null")); } catch(e){}
@@ -479,19 +518,40 @@
 
   function rebuildDecks(want){
     const has = v => v === CUSTOM || (typeof v === "string" && ((v.startsWith("b:") && DECKS[v.slice(2)]) || (v.startsWith("u:") && USER[v.slice(2)])));
-    let v = want || store.get("fg_deck");
-    if (!has(v) && has("b:" + v)) v = "b:" + v;      // old saved value without prefix
-    if (!has(v)) v = Object.keys(DECKS).length ? "b:" + Object.keys(DECKS)[0] : "";
-    pickDeck(v);
+    pickDeck(has(want) ? want : "");               // nothing is pre-selected: neither on launch nor after a theme is cleared
   }
   function pickDeck(v){
     curDeck = v || "";
     syncDeck(); renderDrawers();
   }
-  function syncDeck(){ $("#customWrap").style.display = curDeck === CUSTOM ? "flex" : "none"; }
+  function deckList(){
+    if (curDeck.startsWith("u:")) return USER[curDeck.slice(2)] || [];
+    if (curDeck.startsWith("b:")) return DECKS[curDeck.slice(2)] || [];
+    return [];
+  }
+  function syncDeck(){
+    $("#customWrap").style.display = curDeck === CUSTOM ? "flex" : "none";
+    const hw = $("#hardWrap"), want = hasHard(deckList());       // the checkbox only exists for lists that have forbidden words
+    if (want && hw.style.display === "none") { hw.style.display = "flex"; hw.style.animation = "none"; void hw.offsetWidth; hw.style.animation = ""; }
+    else if (!want) hw.style.display = "none";
+  }
+  $("#hardOn").checked = store.get("fg_hard", "0") === "1";
+  $("#hardOn").onchange = () => store.set("fg_hard", $("#hardOn").checked ? "1" : "0");
+  let drawTimer = 0;
+  function deselect(redraw = true){
+    curDeck = ""; moreFor = ""; confirmClear = ""; syncDeck(); note("");
+    if (redraw) renderDrawers();
+  }
+  // tapping empty space (not a control) clears the selection
+  document.addEventListener("click", e => {
+    if (phase !== "menu" || !curDeck) return;
+    if (e.target.closest("#drawers,button,input,textarea,label,a,select,summary,#customWrap")) return;
+    deselect();
+  }, true);       // capture phase: the tapped element is still in the DOM when we test it
   function pickItem(v){ note(""); if (curDeck !== v) { moreFor = ""; confirmClear = ""; } pickDeck(v); store.set("fg_deck", v); }
 
   function renderDrawers(){
+    syncDeck();
     const host = $("#drawers"), keep = {};
     host.querySelectorAll(".dBody").forEach(b => keep[b.dataset.d] = b.scrollTop);
     host.textContent = "";
@@ -517,7 +577,7 @@
     const row = el("div", "item" + (curDeck === v ? " active" : ""));
     const main = el("div", "iMain");
     main.append(el("span", "dot"), el("span", "iName", label));
-    if (count != null) main.append(el("span", "iCount", String(count)));
+    if (count != null && curDeck === v) main.append(el("span", "iCount", String(count)));
     main.onclick = () => pickItem(v);
     row.append(main); if (acts) row.append(acts);
     return row;
@@ -544,15 +604,25 @@
         d.classList.toggle("open", o);
         d.querySelector(".dHead").setAttribute("aria-expanded", String(o));
       });
+      // a drawer that closes drops the selection that lived inside it
+      const owner = curDeck.startsWith("b:") ? "b" : (curDeck.startsWith("u:") || curDeck === CUSTOM) ? "u" : "";
+      if (owner && !DRAW[owner]) {
+        deselect(false);
+        document.querySelectorAll("#drawers .item.active").forEach(r => {
+          r.classList.remove("active");
+          r.querySelectorAll(".iActs,.iCount").forEach(x => x.remove());
+          if (r.nextElementSibling && r.nextElementSibling.classList.contains("more")) r.nextElementSibling.remove();
+        });
+        clearTimeout(drawTimer); drawTimer = setTimeout(renderDrawers, 800);   // refresh labels after the slide finishes
+      } else { clearTimeout(drawTimer); }
     };
     const body = el("div", "dBody" + (!isB && moreFor && USER[moreFor] ? " tall" : "")); body.dataset.d = id;
     if (isB) {
-      names.forEach(n => body.append(itemRow("b:" + n, n, DECKS[n].length)));
+      names.forEach(n => body.append(itemRow("b:" + n, n, null)));
     } else {
       names.forEach(n => {
         const acts = el("div", "iActs");
         acts.append(
-          mini(ICON.export, "Export as a .js list file", () => exportTheme(n), "s-export"),
           mini(ICON.sparkle, "Generate more entries with AI", () => { moreFor = moreFor === n ? "" : n; moreMsg = { text: "", cls: "" }; renderDrawers(); }, "s-more" + (moreFor === n ? " on" : "")),
           confirmClear === n
             ? mini(ICON.check, "Tap again to clear this theme", () => clearTheme(n), "s-clear warn", "Sure?")
@@ -575,6 +645,8 @@
     return box;
   }
 
+  const moreHard = {};          // per theme: generate forbidden words too? (default: yes if the list already has them)
+  const wantHard = n => n in moreHard ? moreHard[n] : hasHard(USER[n]);
   function morePanel(n){
     const p = el("div", "more");
     p.append(el("p", "hint", "Sends your " + USER[n].length + " current entries to Gemini so it finds different ones."));
@@ -582,6 +654,10 @@
     const inp = el("input"); inp.type = "number"; inp.min = 10; inp.max = 500; inp.step = 10; inp.value = moreCount; inp.disabled = moreBusy;
     inp.oninput = () => { moreCount = Math.max(10, Math.min(500, parseInt(inp.value, 10) || 100)); };
     lab.append(inp); p.append(lab);
+    const hc = el("label", "fancyChk"), hi = el("input"); hi.type = "checkbox"; hi.checked = wantHard(n); hi.disabled = moreBusy;
+    hi.onchange = () => { moreHard[n] = hi.checked; };
+    const ht = el("span", "txt", "Hard mode"); ht.append(el("small", null, "also write forbidden words for the new entries"));
+    hc.append(hi, el("span", "box"), ht); p.append(hc);
     const row = el("div", "row");
     const add = el("button", null, moreBusy ? "Working…" : "Add to list"); add.disabled = moreBusy; add.onclick = () => generateMore(n, "add");
     const rep = el("button", "secondary", "Replace list"); rep.disabled = moreBusy; rep.onclick = () => generateMore(n, "replace");
@@ -601,17 +677,6 @@
     const e = $("#moreStatus"); if (e) { e.textContent = text; e.className = "status " + cls; }
   };
 
-  function exportTheme(name){
-    const list = USER[name]; if (!list) return;
-    const txt = "// Exported from Forehead Game. Put this file in lists/ and add a <script src> tag for it in index.html.\n" +
-      "(window.LISTS = window.LISTS || {})[" + JSON.stringify(name) + "] = `\n" + list.join("\n") + "\n`;\n";
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([txt], { type: "text/javascript" }));
-    a.download = slug(name) + ".js";
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-    note("Exported " + a.download, "ok");
-  }
   function clearTheme(n){            // two taps instead of a confirm popup
     if (confirmClear !== n) {
       confirmClear = n; renderDrawers();
@@ -635,14 +700,89 @@
       });
       t.append(w);
     });
+    titlePhysics(t);
   })();
+
+  /* Useless but fun: the title words can be thrown around inside an invisible box (inertia + collisions) */
+  function titlePhysics(box){
+    const words = [...box.querySelectorAll(".tw")].map(el => ({ el, x: 0, y: 0, w: 0, h: 0, m: 1, vx: 0, vy: 0, drag: false, tx: 0, ty: 0 }));
+    let W = 0, H = 0, running = false, last = 0;
+    // Weighty feel: low bounciness, heavy friction, and a soft spring (not a rigid grip) between finger and word,
+    // so a word lags behind the finger, has to be dragged against other words, and keeps its momentum when let go.
+    const REST = 0.18, FRICTION = 3.2, SPRING = 55, MAXV = 1800;
+    const paint = () => words.forEach(o => { o.el.style.transform = "translate(" + o.x.toFixed(1) + "px," + o.y.toFixed(1) + "px)"; });
+
+    function layout(){
+      box.classList.remove("phys"); box.style.height = "";
+      words.forEach(o => { o.el.style.transform = ""; });
+      const br = box.getBoundingClientRect();
+      if (!br.width) { setTimeout(layout, 400); return; }        // menu not visible yet
+      words.forEach(o => { const r = o.el.getBoundingClientRect(); o.x = r.left - br.left; o.y = r.top - br.top + 6; o.w = r.width; o.h = r.height; o.m = Math.max(.6, o.w * o.h / 6000); o.vx = o.vy = 0; });
+      W = br.width; H = Math.ceil(br.height) + 14;
+      box.classList.add("phys"); box.style.height = H + "px"; paint();
+    }
+
+    function collide(a, b){
+      const ox = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+      const oy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+      if (ox <= 0 || oy <= 0) return;
+      const horiz = ox < oy, k = horiz ? "x" : "y", v = horiz ? "vx" : "vy", sz = horiz ? "w" : "h", pen = horiz ? ox : oy;
+      const n = (b[k] + b[sz] / 2 >= a[k] + a[sz] / 2) ? 1 : -1;       // b sits on this side of a
+      const ia = 1 / a.m, ib = 1 / b.m, tot = ia + ib;
+      a[k] -= n * pen * ia / tot; b[k] += n * pen * ib / tot;            // the lighter word gets shoved further
+      const vrel = b[v] - a[v];
+      if (vrel * n < 0) { const j = -(1 + REST) * vrel / tot; a[v] -= j * ia; b[v] += j * ib; if (Math.abs(vrel) > 90) sfx("knock", Math.abs(vrel)); }
+    }
+
+    function step(now){
+      const dt = Math.min(.025, (now - last) / 1000 || .016); last = now;
+      let busy = false;
+      words.forEach(o => {
+        if (o.drag) {                                     // soft critically-damped spring towards the finger, divided by mass
+          const c = 2 * Math.sqrt(SPRING);
+          o.vx += ((SPRING * (o.tx - o.x) - c * o.vx) / o.m) * dt;
+          o.vy += ((SPRING * (o.ty - o.y) - c * o.vy) / o.m) * dt;
+          busy = true;
+        }
+        const f = Math.exp(-FRICTION * dt); o.vx *= f; o.vy *= f;
+        const sp = Math.hypot(o.vx, o.vy); if (sp > MAXV) { o.vx *= MAXV / sp; o.vy *= MAXV / sp; }
+        o.x += o.vx * dt; o.y += o.vy * dt;
+        const hit = sp => { if (sp > 130) sfx("knock", sp * .8); };
+        if (o.x < 0) { o.x = 0; hit(Math.abs(o.vx)); o.vx = Math.abs(o.vx) * REST; }
+        if (o.x > W - o.w) { o.x = W - o.w; hit(Math.abs(o.vx)); o.vx = -Math.abs(o.vx) * REST; }
+        if (o.y < 0) { o.y = 0; hit(Math.abs(o.vy)); o.vy = Math.abs(o.vy) * REST; }
+        if (o.y > H - o.h) { o.y = H - o.h; hit(Math.abs(o.vy)); o.vy = -Math.abs(o.vy) * REST; }
+        if (!o.drag) { if (Math.hypot(o.vx, o.vy) > 5) busy = true; else o.vx = o.vy = 0; }
+      });
+      for (let it = 0; it < 3; it++) for (let i = 0; i < words.length; i++) for (let j = i + 1; j < words.length; j++) collide(words[i], words[j]);
+      words.forEach(o => { o.x = Math.max(0, Math.min(W - o.w, o.x)); o.y = Math.max(0, Math.min(H - o.h, o.y)); });
+      paint();
+      if (busy) requestAnimationFrame(step); else running = false;
+    }
+    const wake = () => { if (!running) { running = true; last = performance.now(); requestAnimationFrame(step); } };
+
+    words.forEach(o => {
+      let ox = 0, oy = 0;
+      const aim = e => { const br = box.getBoundingClientRect(); o.tx = e.clientX - br.left - ox; o.ty = e.clientY - br.top - oy; };
+      o.el.addEventListener("pointerdown", e => {
+        const br = box.getBoundingClientRect();
+        sfx("tick"); o.drag = true; ox = e.clientX - br.left - o.x; oy = e.clientY - br.top - o.y; aim(e);
+        o.el.classList.add("drag"); try { o.el.setPointerCapture(e.pointerId); } catch(_){}
+        wake(); e.preventDefault();
+      });
+      o.el.addEventListener("pointermove", e => { if (o.drag) aim(e); });
+      const up = () => { if (!o.drag) return; o.drag = false; o.el.classList.remove("drag"); wake(); };
+      o.el.addEventListener("pointerup", up); o.el.addEventListener("pointercancel", up);
+    });
+
+    layout();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(layout);
+    let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(layout, 150); });
+    box._physLayout = layout;
+  }
   $("#custom").value = store.get("fg_custom", "");
   rebuildDecks();
-  if (!DRAW) DRAW = { b: !curDeck || curDeck.startsWith("b:"), u: curDeck.startsWith("u:") || curDeck === CUSTOM };
-  if (DRAW.b && DRAW.u) {
-    if (curDeck.startsWith("u:") || curDeck === CUSTOM) DRAW.b = false;
-    else DRAW.u = false;
-  }
+  DRAW = { b: false, u: false };                     // every launch starts clean: drawers closed, nothing selected
   store.set("fg_drawers", JSON.stringify(DRAW));
   renderDrawers();
 
@@ -656,6 +796,8 @@
   $("#unlimited").onchange = e => { store.set("fg_unlimited", e.target.checked ? "1" : "0"); syncUnlimited(); };
   $("#settingsBtn").onclick = () => { phase = "settings"; show("settings"); };
   $("#touchOn").checked = store.get("fg_touch", "1") !== "0";
+  $("#uiSound").checked = uiSoundOn;
+  $("#uiSound").onchange = e => { uiSoundOn = e.target.checked; store.set("fg_ui_sound", uiSoundOn ? "1" : "0"); sfx("on"); };
   $("#touchOn").onchange = e => store.set("fg_touch", e.target.checked ? "1" : "0");
 
 
@@ -732,6 +874,12 @@
 
   const shuffle = a => { for (let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]];} return a; };
   const nextWord = () => { if (!queue.length) queue = shuffle(words.slice()); return queue.pop(); };
+  let hardRound = false;
+  function showNext(){
+    const { t, f } = splitEntry(nextWord()), fb = $("#forbid");
+    $("#word").textContent = t; fb.textContent = "";
+    if (hardRound) f.forEach(w => fb.append(el("span", null, w)));
+  }
 
   function getWords(){
     if (curDeck === CUSTOM) {
@@ -809,6 +957,58 @@
   }
   const buzz = p => { try { navigator.vibrate && navigator.vibrate(p); } catch(e){} };
 
+  /* ---------- Menu sounds: tiny soft boops and bips (very quiet on purpose) ---------- */
+  let lastKnock = 0;
+  // one soft note: sine/triangle with a quick attack and a short, round decay
+  function blip(freq, at, dur, vol, type = "sine", to){
+    const c = ctx(), t = c.currentTime + at, o = c.createOscillator(), g = c.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    if (to) o.frequency.exponentialRampToValueAtTime(to, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + dur + 0.03);
+  }
+  function sfx(name, arg){
+    if (!uiSoundOn) return;
+    try {
+      const V = 0.05;                                                     // master loudness of every UI sound
+      switch (name) {
+        case "tap":    blip(660, 0, .07, V * .8, "sine", 740); break;
+        case "pick":   blip(523, 0, .07, V); blip(784, .055, .1, V); break;
+        case "open":   blip(392, 0, .08, V * .9); blip(523, .06, .08, V * .9); blip(659, .12, .13, V * .9); break;
+        case "close":  blip(659, 0, .07, V * .8); blip(494, .06, .09, V * .8); blip(370, .12, .12, V * .7); break;
+        case "on":     blip(587, 0, .07, V); blip(880, .06, .12, V); break;
+        case "off":    blip(880, 0, .07, V * .9); blip(587, .06, .11, V * .9); break;
+        case "back":   blip(494, 0, .06, V * .8); blip(370, .05, .1, V * .8); break;
+        case "play":   [523, 659, 784, 1047].forEach((f, i) => blip(f, i * .06, i === 3 ? .22 : .09, V * 1.1, "triangle")); break;
+        case "warn":   blip(330, 0, .08, V, "triangle"); blip(330, .1, .1, V, "triangle"); break;
+        case "delete": blip(440, 0, .2, V, "triangle", 165); break;
+        case "tick":   blip(1175, 0, .035, V * .5); break;
+        case "knock": {                                                   // title words bumping: a soft wooden "tok", louder when harder
+          const now = performance.now(); if (now - lastKnock < 70) return; lastKnock = now;
+          blip(190 + Math.random() * 40, 0, .1, Math.min(V * 1.4, V * .35 + arg / 3500 * V), "triangle", 95);
+          break;
+        }
+      }
+    } catch(e){}
+  }
+  // one delegated listener (capture phase, so it runs before handlers that rebuild the DOM)
+  document.addEventListener("click", e => {
+    const t = e.target.closest && e.target.closest("button, .iMain, .dHead");
+    if (!t || t.disabled) return;
+    if (t.id === "startBtn") return sfx(curDeck ? "play" : "warn");
+    if (t.classList.contains("backBtn")) return sfx("back");
+    if (t.classList.contains("dHead")) return sfx(t.closest(".drawer").classList.contains("open") ? "close" : "open");
+    if (t.classList.contains("iMain")) return t.closest(".item").classList.contains("active") ? 0 : sfx("pick");
+    if (t.classList.contains("s-clear")) return sfx(t.classList.contains("warn") ? "delete" : "warn");
+    sfx("tap");
+  }, true);
+  document.addEventListener("change", e => {
+    const i = e.target;
+    if (i && i.type === "checkbox" && i.id !== "uiSound") sfx(i.checked ? "on" : "off");
+  });
+
   /* ---------- Flow ---------- */
   let run = 0;
   const CANCEL = {};
@@ -819,6 +1019,7 @@
   async function startInner(my){
     const nap = async ms => { await sleep(ms); if (my !== run) throw CANCEL; };
     words = getWords();
+    hardRound = curDeck !== CUSTOM && $("#hardWrap").style.display !== "none" && $("#hardOn").checked;
     if (!curDeck) { note("Pick a theme first.", "err"); return; }
     if (words.length < 3) { note("Need at least 3 entries in the theme.", "err"); return; }
     store.set("fg_deck", curDeck);
@@ -878,8 +1079,8 @@
   const fmtTime = n => n >= 60 ? Math.floor(n / 60) + ":" + String(n % 60).padStart(2, "0") : String(n);
   $("#finishBtn").onclick = () => {                   // two taps, so a finger on the edge can't end the round
     if (!finishArmed) {
-      finishArmed = true; $("#finishBtn").textContent = "Tap again to finish";
-      setTimeout(() => { finishArmed = false; $("#finishBtn").textContent = "Finish round"; }, 2500);
+      finishArmed = true; $("#finishBtn").textContent = "tap again to finish";
+      setTimeout(() => { finishArmed = false; $("#finishBtn").textContent = "finish round ›"; }, 2500);
     } else endRound();
   };
   function beginRound(){
@@ -889,11 +1090,11 @@
     startAt = performance.now();
     endAt = unlimitedRound ? Infinity : startAt + secs * 1000;
     $("#finishBtn").style.display = unlimitedRound ? "block" : "none";
-    $("#finishBtn").textContent = "Finish round"; finishArmed = false;
+    $("#finishBtn").textContent = "finish round ›"; finishArmed = false;
     phase = "play";
     $("#score").textContent = 0;
-    $("#word").textContent = nextWord();
-    $("#game").className = "screen active";
+    showNext();
+    $("#game").className = "screen active" + (hardRound ? " hard" : "");
     show("game"); beep(880, 0.25); buzz(150);
   }
 
@@ -903,12 +1104,12 @@
     lock = true; armed = false; holdDir = 0;
     const w = $("#word").textContent;
     const g = $("#game");
-    if (kind === "ok") { correct.push(w); g.classList.add("ok"); $("#word").textContent = "Correct!"; bell(); buzz(60); }
-    else { passed.push(w); g.classList.add("pass"); $("#word").textContent = "PASS"; womp(); buzz([40,40,40]); }
+    if (kind === "ok") { correct.push(w); g.classList.add("ok"); $("#word").textContent = "Correct!"; $("#forbid").textContent = ""; bell(); buzz(60); }
+    else { passed.push(w); g.classList.add("pass"); $("#word").textContent = "PASS"; $("#forbid").textContent = ""; womp(); buzz([40,40,40]); }
     $("#score").textContent = correct.length;
     setTimeout(() => {
       g.classList.remove("ok","pass");
-      if (phase === "play") $("#word").textContent = nextWord();
+      if (phase === "play") showNext();
       lock = false;
       // Must return to neutral before next answer registers
       armed = false;
@@ -980,10 +1181,16 @@
   const gstat = (msg, cls="") => { const e = $("#genStatus"); e.textContent = msg; e.className = "status " + cls; };
 
   // The prompt: this is what decides the quality of the lists.
-  function buildPrompt(theme, total, avoid){
+  function buildPrompt(theme, total, avoid, hard){
     const task = avoid && avoid.length
       ? `ALREADY IN THE LIST (${avoid.length} entries). Do NOT repeat any of them, nor near-duplicates or other spellings of them. Find DIFFERENT items that fit the same theme, in the same style and difficulty mix:\n${avoid.slice(0, 1000).join("\n")}\n\nWrite ${total} different NEW entries that belong to this theme.`
       : `Write ${total} different entries that belong to this theme.`;
+    const fmt = hard
+      ? `2. Format: each entry is ONE string of the form "Term|forbidden1, forbidden2, forbidden3". The term is a name or short phrase of 1 to 5 words, in its most common form (no numbering, explanations, parentheses, quotes or notes, and no years unless they are part of the name), then a pipe character |, then 3 to 5 forbidden words separated by commas.`
+      : `2. Format: each entry is a name or short phrase of 1 to 5 words, in its most common form. No numbering, explanations, parentheses, quotes or notes, and no years unless they are part of the name. Do not use the pipe character.`;
+    const forb = hard ? `
+HARD MODE, the forbidden words: these are words the clue-givers are NOT allowed to say, exactly like the cards in the game Taboo. For each term pick the 3 to 5 words that players would most naturally blurt out to make the guesser find it: its most obvious associations and the things most closely tied to it. For a person: their job, best-known work, group, nickname or catchphrase. For a film, series or game: the franchise, director, lead actor or character, genre, studio. For an object, place or concept: its category, typical use, location, and its most obvious synonym. For a technical term: the closest related terms. Rules for forbidden words: each is a single word or a very short phrase (at most 2 words); never the term itself, a word of the term, or a plural or conjugation of it; no two forbidden words from the same root; written in the same language as the term; and no commas or pipes inside them. Example of the format: "Taylor Swift|Eras Tour, Swiftie, pop star, Kanye, Grammy".
+` : "";
     return `You are writing the word list for a party guessing game (like Heads Up! or charades). One player holds a phone on their forehead; their friends give spoken clues or act things out until that player guesses the word on the screen.
 
 THEME: ${JSON.stringify(theme)}
@@ -992,7 +1199,7 @@ ${task}
 
 Requirements:
 1. Guessable: every entry must be something most players would recognise and be able to describe or act out. Prefer well-known, specific things over obscure ones. If the theme is niche, stick to the best-known items of that niche.
-2. Format: each entry is a name or short phrase of 1 to 5 words, in its most common form. No numbering, explanations, parentheses, quotes or notes, and no years unless they are part of the name.
+${fmt}
 3. Distinct: no duplicates or near-duplicates (the same thing spelled differently, or many sequels or variants of one thing).
 4. Difficulty mix: roughly 50% easy, 35% medium, 15% hard.
 5. Breadth: cover the whole theme and its different sub-areas instead of clustering on one. Put the entries in random order.
@@ -1000,30 +1207,36 @@ Requirements:
 7. Real and accurate: only include things that really exist, unless the theme is explicitly fictional. Never invent entries.
 8. Keep everything suitable for a general audience: no slurs, no graphic or sexual content.
 9. If the theme is ambiguous, choose the most common reading for a party game.
-
+${forb}
 Return JSON only, in the form {"entries": ["...", "..."]}.`;
   }
 
   const norm = e => e.normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
-  function cleanEntries(arr){
+  function cleanEntries(arr, hard = true){
     const seen = new Set(), out = [];
     for (let e of arr) {
       if (typeof e !== "string") continue;
       e = e.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "").replace(/[`\\"“”]/g, "").replace(/\$\{/g, "").replace(/\s+/g, " ").trim();
-      if (!e || e.length > 60) continue;
-      const k = norm(e) || e.toLowerCase();
+      const sp = splitEntry(e), t = sp.t;
+      if (!t || t.length > 60) continue;
+      const k = norm(t) || t.toLowerCase();
       if (seen.has(k)) continue;
-      seen.add(k); out.push(e);
+      let f = [];
+      if (hard) {                                          // tidy the forbidden words: no term, no repeats, short, max 6
+        const fs = new Set([k]);
+        for (const w of sp.f) { const wk = norm(w) || w.toLowerCase(); if (w.length > 30 || fs.has(wk)) continue; fs.add(wk); f.push(w); if (f.length >= 6) break; }
+      }
+      seen.add(k); out.push(f.length ? t + "|" + f.join(", ") : t);
     }
     return out;
   }
-  function parseEntries(text){
+  function parseEntries(text, hard = true){
     try {
       const j = JSON.parse(text);
       const a = Array.isArray(j) ? j : (j && Array.isArray(j.entries) ? j.entries : null);
-      if (a) return cleanEntries(a);
+      if (a) return cleanEntries(a, hard);
     } catch(e){}
-    return cleanEntries(text.split(/\r?\n/));      // fallback if the model ignored the JSON format
+    return cleanEntries(text.split(/\r?\n/), hard);      // fallback if the model ignored the JSON format
   }
 
   // Ranked list of usable models: fast Flash-Lite first, then Flash; newer and stable versions first.
@@ -1046,6 +1259,7 @@ Return JSON only, in the form {"entries": ["...", "..."]}.`;
   // a word list. We ask for no/minimal thinking; models that don't accept a setting make us fall to the next one.
   // Request variants, tried in order. Google's 400 error is often just "invalid argument" with no hint
   // about which setting the model dislikes, so ANY 400 (except a bad key) moves on to the next variant.
+  let genMaxTokens = 8192;               // hard mode lists are several times longer
   const THINK = [
     { think: { thinkingBudget: 0 } },
     { think: { thinkingLevel: "minimal" } },
@@ -1060,7 +1274,7 @@ Return JSON only, in the form {"entries": ["...", "..."]}.`;
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
-          temperature: 1, maxOutputTokens: 8192, responseMimeType: "application/json",
+          temperature: 1, maxOutputTokens: genMaxTokens, responseMimeType: "application/json",
           ...(v.think ? { thinkingConfig: v.think } : {}),
           ...(v.plain ? {} : { responseSchema: { type: "OBJECT", properties: { entries: { type: "ARRAY", items: { type: "STRING" } } }, required: ["entries"] } })
         }
@@ -1086,7 +1300,7 @@ Return JSON only, in the form {"entries": ["...", "..."]}.`;
     return (e.message || String(e)) + tech;
   }
 
-  const keyOf = e => norm(e) || e.toLowerCase();
+  const keyOf = e => { const t = splitEntry(e).t; return norm(t) || t.toLowerCase(); };
   const TMO = 45000;       // per attempt: a model that is this slow gets skipped for the next one
 
   // Live status with an elapsed-seconds counter
@@ -1137,11 +1351,14 @@ Return JSON only, in the form {"entries": ["...", "..."]}.`;
 
   /* ----- Generate screen ----- */
   let genRun = 0, lastGenTheme = "";
+  $("#genHard").checked = store.get("fg_gen_hard", "1") === "1";            // hard mode generation is on by default
   $("#genBtn").onclick = async () => {
     const my = ++genRun;
     const key = $("#apiKey").value.trim();
     const theme = $("#genTheme").value.replace(/\s+/g, " ").trim();
     const want = Math.max(10, Math.min(500, parseInt($("#genCount").value, 10) || 150));
+    const hard = $("#genHard").checked; store.set("fg_gen_hard", hard ? "1" : "0");
+    genMaxTokens = hard ? 20000 : 8192;
     $("#genOut").classList.remove("on");
     if (!key) return gstat("Paste your Gemini API key first.", "err");
     if (!theme) return gstat("Type a theme first.", "err");
@@ -1150,9 +1367,9 @@ Return JSON only, in the form {"entries": ["...", "..."]}.`;
     const pg = progress(m => gstat(m));
     try {
       const total = want + Math.ceil(want * 0.15);          // ask for extra, duplicates get removed then we trim
-      const { text, model } = await askGemini(key, buildPrompt(theme, total), m => pg.prog(m.replace(/…$/, "") + " for " + want + " entries…"));
+      const { text, model } = await askGemini(key, buildPrompt(theme, total, null, hard), m => pg.prog(m.replace(/…$/, "") + " for " + want + " entries…"));
       if (my !== genRun) return;
-      const entries = parseEntries(text).slice(0, want);
+      const entries = parseEntries(text, hard).slice(0, want);
       if (entries.length < 3) throw new Error("Gemini did not return a usable list. Try again or reword the theme.");
       lastGenTheme = theme;
       $("#genName").value = theme.length > 40 ? theme.slice(0, 40).trim() : theme;
@@ -1173,14 +1390,15 @@ Return JSON only, in the form {"entries": ["...", "..."]}.`;
     if (moreBusy || !USER[name]) return;
     const key = ($("#apiKey").value || store.get("fg_gemini_key", "")).trim();
     if (!key) { moreMsg = { text: "Add your Gemini API key first (on the Generate screen).", cls: "err", needKey: true }; renderDrawers(); return; }
-    const old = USER[name].slice(), want = Math.max(10, Math.min(500, moreCount || 100));
+    const old = USER[name].slice(), want = Math.max(10, Math.min(500, moreCount || 100)), hard = wantHard(name);
+    genMaxTokens = hard ? 20000 : 8192;
     moreBusy = true; undoInfo = null; setMore("Starting…"); renderDrawers();
     const pg = progress(m => setMore(m));
     try {
       const total = want + Math.ceil(want * 0.3);          // extra, because some will be repeats
-      const { text, model } = await askGemini(key, buildPrompt(META[name] || name, total, old), m => pg.prog(m.replace(/…$/, "") + " for " + want + " new entries…"));
+      const { text, model } = await askGemini(key, buildPrompt(META[name] || name, total, old.map(e => splitEntry(e).t), hard), m => pg.prog(m.replace(/…$/, "") + " for " + want + " new entries…"));
       const seen = new Set(old.map(keyOf));
-      const parsed = parseEntries(text);
+      const parsed = parseEntries(text, hard);
       const fresh = parsed.filter(e => !seen.has(keyOf(e))).slice(0, want);
       const repeats = parsed.length - parsed.filter(e => !seen.has(keyOf(e))).length;
       if (mode === "replace") { if (fresh.length < 10) throw new Error("Gemini returned only " + fresh.length + " new entries, so your list was kept. Try again."); }
@@ -1213,7 +1431,7 @@ Return JSON only, in the form {"entries": ["...", "..."]}.`;
     $("#genOut").classList.remove("on"); gstat(""); phase = "menu"; show("menu");
     $("#menuNote").className = "status " + (ok ? "ok" : "err");
     $("#menuNote").textContent = ok ? 'Saved "' + name + '" (' + list.length + " entries) under My themes."
-      : 'Could not save to this browser (private mode?). "' + name + '" is usable until you close the page; use Export to keep it.';
+      : 'Could not save to this browser (private mode?). "' + name + '" is usable until you close the page.';
   };
 
   /* ---------- Buttons ---------- */
